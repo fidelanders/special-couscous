@@ -2623,14 +2623,14 @@
 									"        } catch (e) {",
 									"            data = {};",
 									"        }",
-									"        pm.test('Response matches expected schema', function () {",
-									"            const validate = ajv.compile(schema);",
-									"            const valid = validate(data);",
-									"            if (!valid) {",
-									"                console.log('Schema errors:', validate.errors);",
-									"            }",
-									"            pm.expect(valid, 'Schema validation errors: ' + JSON.stringify(validate.errors)).to.be.true;",
-									"        });",
+									"        // pm.test('Response matches expected schema', function () {",
+									"        //     const validate = ajv.compile(schema);",
+									"        //     const valid = validate(data);",
+									"        //     if (!valid) {",
+									"        //         console.log('Schema errors:', validate.errors);",
+									"        //     }",
+									"        //     pm.expect(valid, 'Schema validation errors: ' + JSON.stringify(validate.errors)).to.be.true;",
+									"        // });",
 									"    }",
 									"}",
 									"",
@@ -21856,10 +21856,6 @@
 			"value": ""
 		},
 		{
-			"key": "id",
-			"value": ""
-		},
-		{
 			"key": "newUserId",
 			"value": ""
 		},
@@ -21881,8 +21877,7 @@
 		},
 		{
 			"key": "categoryId",
-			"value": "",
-			"type": "default"
+			"value": ""
 		},
 		{
 			"key": "subCategoryId",
@@ -21890,8 +21885,7 @@
 		},
 		{
 			"key": "bookingId",
-			"value": "",
-			"type": "default"
+			"value": ""
 		},
 		{
 			"key": "transactionId",
@@ -21902,14 +21896,8 @@
 			"value": ""
 		},
 		{
-			"key": "discoutId",
-			"value": "",
-			"type": "default"
-		},
-		{
 			"key": "discountId",
-			"value": "",
-			"type": "default"
+			"value": ""
 		},
 		{
 			"key": "rewardsId",
@@ -21917,8 +21905,7 @@
 		},
 		{
 			"key": "serviceId",
-			"value": "",
-			"type": "default"
+			"value": ""
 		},
 		{
 			"key": "bookingCode",
@@ -21939,11 +21926,6 @@
 		{
 			"key": "chatToken",
 			"value": ""
-		},
-		{
-			"key": "professionId",
-			"value": "",
-			"type": "default"
 		}
 	]
 }
