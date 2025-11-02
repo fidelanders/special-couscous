@@ -1,0 +1,16 @@
+{
+  "name": "newman_",
+  "version": "1.0.0",
+  "main": "index.js",
+"scripts": {
+  "api:test:report": "newman run collection/Dandys_APIs_collection.json -r htmlextra --reporter-htmlextra-export ./reports/api-report.html"
+},
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "newman": "^6.2.1",
+    "newman-reporter-htmlextra": "^1.23.1"
+  }
+}
