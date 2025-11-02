@@ -20,43 +20,45 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Run Newman using npm script
+      # 4️⃣ Ensure reports folder exists
+      - name: Create reports folder
+        run: mkdir -p reports
+
+      # 5️⃣ Run Newman collection using package.json script
       - name: Run Newman collection
-        run: |
-          mkdir -p $GITHUB_WORKSPACE/reports
-          npm run test:newman
+        run: npm run test:newman
         continue-on-error: true
 
-      # Debug: List reports folder
-      - name: List report files
-        run: ls -la $GITHUB_WORKSPACE/reports
+      # 6️⃣ Debug: list files in reports folder
+      - name: Check reports folder
+        run: ls -la reports
 
-      # Upload HTML report
+      # 7️⃣ Upload HTML report artifact
       - name: Upload HTML report artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: newman-htmlextra-html-report
-          path: $GITHUB_WORKSPACE/reports/api-report.html
+          path: reports/api-report.html
           if-no-files-found: warn
 
-      # Upload JSON report
+      # 8️⃣ Upload JSON report artifact
       - name: Upload JSON report artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: newman-json-report
-          path: $GITHUB_WORKSPACE/reports/api-report.json
+          path: reports/api-report.json
           if-no-files-found: warn
 
-      # Display summary (grouped failed tests)
+      # 9️⃣ Display summary in GitHub Actions with emoji badges
       - name: Generate and display Newman summary
         if: always()
         run: |
           echo "## 🧪 Newman Test Summary" >> $GITHUB_STEP_SUMMARY
-          if [ -f $GITHUB_WORKSPACE/reports/api-report.json ]; then
-            total=$(jq '.run.stats.tests.total' $GITHUB_WORKSPACE/reports/api-report.json)
-            failed=$(jq '.run.stats.tests.failed' $GITHUB_WORKSPACE/reports/api-report.json)
+          if [ -f reports/api-report.json ]; then
+            total=$(jq '.run.stats.tests.total' reports/api-report.json)
+            failed=$(jq '.run.stats.tests.failed' reports/api-report.json)
             passed=$((total - failed))
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "**Total Tests:** $total" >> $GITHUB_STEP_SUMMARY
@@ -64,20 +66,31 @@ jobs:
             echo "**Failed:** ❌ $failed" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
 
+            # Group failed assertions by request name with emoji badges
             if [ "$failed" -gt 0 ]; then
               echo "**Failed Tests:**" >> $GITHUB_STEP_SUMMARY
               jq -r '
                 .run.executions[]
-                | select(.assertions[]? | .error != null)
                 | .item.name as $req
+                | ($req + ":") as $reqName
                 | .assertions[]
-                | select(.error != null)
-                | "- " + $req + ": " + .error.test
-              ' $GITHUB_WORKSPACE/reports/api-report.json >> $GITHUB_STEP_SUMMARY
+                | if .error != null then "- ❌ " + $reqName + " " + .error.test else empty end
+              ' reports/api-report.json >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
             fi
 
-            echo "[📄 Download full HTML report](./reports/api-report.html)" >> $GITHUB_STEP_SUMMARY
+            # Show passed requests with badge
+            echo "**Passed Requests:**" >> $GITHUB_STEP_SUMMARY
+            jq -r '
+              .run.executions[]
+              | .item.name as $req
+              | ($req + ":") as $reqName
+              | .assertions[]
+              | if .error == null then "- ✅ " + $reqName + " " + .assertion else empty end
+            ' reports/api-report.json >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+
+            echo "[📄 Download full HTML report](reports/api-report.html)" >> $GITHUB_STEP_SUMMARY
           else
             echo "⚠️ No JSON report found to summarize." >> $GITHUB_STEP_SUMMARY
           fi
