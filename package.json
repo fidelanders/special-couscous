@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
 "scripts": {
-  "api:test:report": "newman run collection/Dandys_APIs_collection.json -r htmlextra --reporter-htmlextra-export ./reports/api-report.html"
+  "test:newman": "newman run collection/Dandys_APIs_collection.json -r htmlextra --reporter-htmlextra-export ./reports/api-report.html"
 },
   "keywords": [],
   "author": "",
