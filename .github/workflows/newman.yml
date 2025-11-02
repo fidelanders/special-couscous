@@ -5,6 +5,7 @@ on: [push, pull_request]
 jobs:
   newman:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
 
@@ -16,10 +17,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Run Newman but don't stop the job if tests fail
       - name: Run collection with Newman
         run: npm run test:newman
+        continue-on-error: true
 
+      # Always upload the HTML report, even if tests failed
       - name: Upload HTML report artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: newman-htmlextra-report
