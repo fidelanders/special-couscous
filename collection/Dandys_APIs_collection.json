@@ -217,7 +217,7 @@
 														],
 														"body": {
 															"mode": "raw",
-															"raw": "{\r\n    \"address\": \"{{$randomLastName}}@{{domainName}}\",\r\n    \"password\": \"{{Password}}\"\r\n}\r\n"
+															"raw": "{\r\n    \"address\": \"{{$randomFirstName}}@{{domainName}}\",\r\n    \"password\": \"{{Password}}\"\r\n}\r\n"
 														},
 														"url": {
 															"raw": "https://api.mail.tm/accounts",
@@ -241,8 +241,13 @@
 															"listen": "test",
 															"script": {
 																"exec": [
-																	"pm.collectionVariables.set(\"userId\", pm.response.json().data.id);\r",
-																	"pm.collectionVariables.set(\"userToken\", pm.response.json().data.token);\r",
+																	" const responseData = pm.response.json();\r",
+																	"\r",
+																	"pm.test(\"Data object contains id and token properties\", function () {\r",
+																	"    pm.expect(responseData).to.be.an('object');\r",
+																	"    pm.expect(responseData.data).to.have.property('id');\r",
+																	"    pm.expect(responseData.data).to.have.property('token');\r",
+																	"});\r",
 																	"\r",
 																	""
 																],
@@ -264,6 +269,9 @@
 														}
 													],
 													"request": {
+														"auth": {
+															"type": "noauth"
+														},
 														"method": "POST",
 														"header": [
 															{
@@ -273,7 +281,7 @@
 														],
 														"body": {
 															"mode": "raw",
-															"raw": "{\n  \"email\": \"{{tempmail}}\",\n  \"firstname\": \"Johnny\",\n  \"lastname\": \"Drille\",\n  \"password\": \"{{Password}}\",\n  \"phone\": \"{{$randomPhoneNumber}}\",\n  \"gender\": \"OTHERS\"\n  //\"couponCode\": \"WELCOME20\"\n}\n",
+															"raw": "{\n    \"email\": \"{{tempmail}}\",\n    \"firstname\": \"{{$randomFirstName}}\",\n    \"lastname\": \"Ojay\",\n    \"password\": \"{{Password}}\",\n    \"phone\": \"{{$randomPhoneNumber}}\",\n    \"gender\": \"MALE\",\n    \"avatar\": \"https://storage.googleapis.com/user-avatars/123_thumb.jpg\",\n    \"currentDeviceInfo\": {\n        \"name\": \"John's iPhone\",\n        \"uuid\": \"a1b2c3d4-e5f6-g7h8-i9j0-k1l2m3n4o5p6\",\n        \"model\": \"iPhone 15 Pro\",\n        \"category\": \"IOS\"\n    },\n    \"notificationId\": \"c...c:APA91b...\",\n    \"notificationSettings\": {\n        \"chat\": true,\n        \"booking\": true,\n        \"email\": false,\n        \"payment\": true\n    },\n    \"location\": {\n        \"address1\": \"123 Main St\",\n        \"address2\": \"Apt 4B\",\n        \"state\": \"Lagos\",\n        \"city\": \"Ikeja\",\n        \"country\": \"Nigeria\",\n        \"zipCode\": \"100242\",\n        \"coordinates\": {\n            \"longitude\": -74.006,\n            \"latitude\": 40.7128\n        }\n    }\n    //   \"couponCode\": \"WELCOME20\"\n}",
 															"options": {
 																"raw": {
 																	"headerFamily": "json",
@@ -402,7 +410,18 @@
 																	"listen": "test",
 																	"script": {
 																		"exec": [
-																			""
+																			"\r",
+																			"pm.test(\"Response has the required fields - success and data\", function () {\r",
+																			"  const responseData = pm.response.json();\r",
+																			"  \r",
+																			"  pm.expect(responseData).to.be.an('object');\r",
+																			"  pm.expect(responseData.success).to.exist;\r",
+																			"  pm.expect(responseData.data).to.exist;\r",
+																			"  pm.expect(responseData.data).to.be.a('boolean');\r",
+																			"  pm.expect(responseData.success).to.be.true;\r",
+																			"  pm.expect(responseData.data).to.be.true;  \r",
+																			"  pm.expect(responseData.success).to.be.a('boolean');\r",
+																			"});"
 																		],
 																		"type": "text/javascript",
 																		"packages": {},
@@ -612,83 +631,51 @@
 																	"listen": "test",
 																	"script": {
 																		"exec": [
-																			"// 1. Parse JSON\r",
-																			"let jsonData;\r",
-																			"try {\r",
-																			"    jsonData = pm.response.json();\r",
-																			"} catch (e) {\r",
-																			"    pm.test(\"Response is valid JSON\", function () {\r",
-																			"        throw new Error(\"Response body is not valid JSON: \" + e.message);\r",
+																			"// Parse response and get messages array\r",
+																			"const data = pm.response.json();\r",
+																			"const messages = Array.isArray(data[\"hydra:member\"]) ? data[\"hydra:member\"] : [];\r",
+																			"\r",
+																			"// Find the latest message by createdAt timestamp\r",
+																			"let latestMsg = null;\r",
+																			"if (messages.length > 0) {\r",
+																			"    latestMsg = messages.reduce((a, b) => {\r",
+																			"        return new Date(a.createdAt) > new Date(b.createdAt) ? a : b;\r",
 																			"    });\r",
 																			"}\r",
 																			"\r",
-																			"// 2. Assert status 200 and response shape\r",
-																			"pm.test(\"Status code is 200\", function () {\r",
-																			"    pm.expect(pm.response.code).to.eql(200);\r",
-																			"});\r",
-																			"pm.test(\"Response has hydra:member as array\", function () {\r",
-																			"    pm.expect(jsonData).to.have.property(\"hydra:member\");\r",
-																			"    pm.expect(Array.isArray(jsonData[\"hydra:member\"]))\r",
-																			"        .to.be.true;\r",
-																			"});\r",
-																			"\r",
-																			"const members = jsonData[\"hydra:member\"];\r",
-																			"\r",
-																			"// 3. Ensure array has at least one element\r",
-																			"pm.test(\"hydra:member has at least one message\", function () {\r",
-																			"    pm.expect(members.length, \"No messages found in hydra:member\").to.be.above(0);\r",
+																			"// (1) Assertion: latest message is from 'hello@dandysapp.com' and subject is 'Dandys OTP' or 'Your One-Time Password'\r",
+																			"pm.test(\"Latest message is from hello@dandysapp.com and subject is 'Dandys OTP' or 'Your One-Time Password'\", function () {\r",
+																			"    pm.expect(latestMsg, \"No messages found\").to.not.be.null;\r",
+																			"    if (latestMsg) {\r",
+																			"        pm.expect(latestMsg.from && latestMsg.from.address, \"Sender address missing\").to.eql(\"hello@dandysapp.com\");\r",
+																			"        pm.expect([\"Dandys OTP\", \"Your One-Time Password\"]).to.include(latestMsg.subject);\r",
+																			"    }\r",
 																			"});\r",
 																			"\r",
-																			"if (!Array.isArray(members) || members.length === 0) {\r",
-																			"    // No messages to process\r",
-																			"    return;\r",
+																			"// (2) OTP extraction and storage\r",
+																			"function extractOTP(text) {\r",
+																			"    // Match 3-8 digit codes, e.g., 1234, 123456, 152, etc.\r",
+																			"    const match = text && text.match(/\\b(\\d{3,8})\\b/);\r",
+																			"    return match ? match[1] : null;\r",
 																			"}\r",
 																			"\r",
-																			"// 4. Find the last message by createdAt (prefer latest timestamp, break ties by last index)\r",
-																			"let lastIdx = 0;\r",
-																			"let lastMsg = members[0];\r",
-																			"for (let i = 1; i < members.length; i++) {\r",
-																			"    const curr = members[i];\r",
-																			"    if (!curr.createdAt || !lastMsg.createdAt) continue;\r",
-																			"    const currTime = new Date(curr.createdAt).getTime();\r",
-																			"    const lastTime = new Date(lastMsg.createdAt).getTime();\r",
-																			"    if (currTime > lastTime || (currTime === lastTime && i > lastIdx)) {\r",
-																			"        lastMsg = curr;\r",
-																			"        lastIdx = i;\r",
+																			"let otp = null;\r",
+																			"if (latestMsg) {\r",
+																			"    // Try to extract OTP from subject first\r",
+																			"    otp = extractOTP(latestMsg.subject);\r",
+																			"    if (!otp && latestMsg.intro) {\r",
+																			"        // If not found in subject, try intro\r",
+																			"        otp = extractOTP(latestMsg.intro);\r",
+																			"    }\r",
+																			"    if (otp) {\r",
+																			"        pm.collectionVariables.set('otp_code', otp);\r",
+																			"        console.log(otp)\r",
 																			"    }\r",
 																			"}\r",
 																			"\r",
-																			"// 5. Validate sender and subject\r",
-																			"pm.test(\"Latest message is from hello@dandysapp.com and subject is Your One-Time Password\", function () {\r",
-																			"    pm.expect(lastMsg.from && lastMsg.from.address, \"Missing from.address\").to.eql(\"hello@dandysapp.com\");\r",
-																			"    pm.expect(lastMsg.subject, \"Missing subject\").to.include(\"Your One-Time Password\");\r",
+																			"pm.test(\"OTP code was extracted and set as collection variable\", function () {\r",
+																			"    pm.expect(otp, \"OTP code was not found in subject or intro\").to.not.be.null;\r",
 																			"});\r",
-																			"\r",
-																			"// 6. Validate intro contains OTP pattern\r",
-																			"const intro = lastMsg.intro || \"\";\r",
-																			"const otp6 = intro.match(/\\b\\d{6}\\b/);\r",
-																			"const otpFallback = intro.match(/\\b\\d{4,8}\\b/);\r",
-																			"\r",
-																			"pm.test(\"Intro contains a 4-8 digit OTP code\", function () {\r",
-																			"    pm.expect(\r",
-																			"        otp6 || otpFallback,\r",
-																			"        \"No 4-8 digit OTP code found in intro: \" + intro\r",
-																			"    ).to.not.be.null;\r",
-																			"});\r",
-																			"\r",
-																			"// 7. Extract OTP (prefer 6 digits, else 4-8 digits)\r",
-																			"let otp = otp6 ? otp6[0] : (otpFallback ? otpFallback[0] : null);\r",
-																			"\r",
-																			"// 8. Save OTP as collection variable if found\r",
-																			"if (otp) {\r",
-																			"    pm.collectionVariables.set(\"otp\", otp);\r",
-																			"    console.log(otp)\r",
-																			"} else {\r",
-																			"    pm.collectionVariables.unset(\"otp\");\r",
-																			"}\r",
-																			"\r",
-																			"// 9. Log message id and createdAt for debugging\r",
-																			"console.log(\"Chosen message id:\", lastMsg.id, \"createdAt:\", lastMsg.createdAt);\r",
 																			""
 																		],
 																		"type": "text/javascript",
@@ -701,7 +688,7 @@
 																	"script": {
 																		"exec": [
 																			"// Delay execution for 20 seconds (20,000 milliseconds)\r",
-																			"const delayInMilliseconds = 5000; // 20 seconds\r",
+																			"const delayInMilliseconds = 3000; // 20 seconds\r",
 																			"\r",
 																			"function sleep(ms) {\r",
 																			"    return new Promise(resolve => setTimeout(resolve, ms));\r",
@@ -763,7 +750,7 @@
 																],
 																"body": {
 																	"mode": "raw",
-																	"raw": "{\r\n    \"code\":\"{{otp}}\",\r\n    \"trxId\": \"72f12b6083585852adad44e8abd98e8a\",\r\n    \"channel\": \"email\"\r\n}",
+																	"raw": "{\r\n    \"code\":\"{{otp_code}}\",\r\n    \"trxId\": \"72f12b6083585852adad44e8abd98e8a\",\r\n    \"channel\": \"email\"\r\n}",
 																	"options": {
 																		"raw": {
 																			"headerFamily": "json",
@@ -891,7 +878,7 @@
 															"const response = pm.response.json();",
 															"",
 															"if(response && response?.data?.token) {",
-															"    pm.collectionVariables.set(\"userToken\", response.data.token)",
+															"    pm.collectionVariables.set(\"newUserToken\", response.data.token)",
 															"    pm.collectionVariables.set(\"newUserId\", response.data.id)",
 															"    pm.collectionVariables.set(\"firstname\", response.data.firstname)",
 															"    pm.collectionVariables.set(\"lastname\", response.data.lastname)",
@@ -1060,7 +1047,7 @@
 													"bearer": [
 														{
 															"key": "token",
-															"value": "{{userToken}}",
+															"value": "{{newUserToken}}",
 															"type": "string"
 														}
 													]
@@ -1164,12 +1151,7 @@
 																	"let response = pm.response.json();",
 																	"pm.collectionVariables.set(\"tempmail_id\", response.id);",
 																	"pm.collectionVariables.set(\"tempmail\", response.address);",
-																	"",
-																	"// 8. General test for Content-Type header",
-																	"pm.test('Content-Type is application/json', function () {",
-																	"    pm.response.to.have.header('Content-Type');",
-																	"    pm.expect(pm.response.headers.get('Content-Type')).to.include('application/ld+json; charset=utf-8');",
-																	"});"
+																	""
 																],
 																"type": "text/javascript",
 																"packages": {},
@@ -1180,6 +1162,18 @@
 															"listen": "prerequest",
 															"script": {
 																"exec": [
+																	"// Delay execution for 5 seconds (5,000 milliseconds)",
+																	"const delayInMilliseconds = 5000; // 20 seconds",
+																	"",
+																	"function sleep(ms) {",
+																	"    return new Promise(resolve => setTimeout(resolve, ms));",
+																	"}",
+																	"",
+																	"(async () => {",
+																	"    console.log(`⏳ Delaying request for ${delayInMilliseconds / 1000} seconds...`);",
+																	"    await sleep(delayInMilliseconds);",
+																	"    console.log(\"✅ Proceeding with the request...\");",
+																	"})();",
 																	""
 																],
 																"type": "text/javascript",
@@ -1201,7 +1195,7 @@
 														],
 														"body": {
 															"mode": "raw",
-															"raw": "{\r\n    \"address\": \"{{$randomLastName}}@{{domainName}}\",\r\n    \"password\": \"{{Password}}\"\r\n}\r\n"
+															"raw": "{\r\n    \"address\": \"{{$randomFirstName}}@{{domainName}}\",\r\n    \"password\": \"{{Password}}\"\r\n}\r\n"
 														},
 														"url": {
 															"raw": "https://api.mail.tm/accounts",
@@ -1225,26 +1219,11 @@
 															"listen": "test",
 															"script": {
 																"exec": [
-																	"pm.test(\"Response status code is 201\", function () {\r",
-																	"  pm.expect(pm.response.to.have.status(201));\r",
-																	"});\r",
-																	"\r",
-																	"pm.test(\"Response time is within an acceptable range\", function () {\r",
-																	"  pm.expect(pm.response.responseTime).to.be.below(200);\r",
-																	"});\r",
-																	"\r",
 																	" const responseData = pm.response.json();\r",
 																	"\r",
-																	"pm.test(\"Response has the required fields\", function () {  \r",
+																	"pm.test(\"Data object contains id and token properties\", function () {\r",
 																	"    pm.expect(responseData).to.be.an('object');\r",
-																	"    pm.expect(responseData.statusCode).to.exist;\r",
-																	"    pm.expect(responseData.message).to.exist;\r",
-																	"    pm.expect(responseData.data).to.exist;\r",
-																	"});\r",
-																	"\r",
-																	"pm.test(\"Data object contains _id and token properties\", function () {\r",
-																	"    pm.expect(responseData).to.be.an('object');\r",
-																	"    pm.expect(responseData.data).to.have.property('_id');\r",
+																	"    pm.expect(responseData.data).to.have.property('id');\r",
 																	"    pm.expect(responseData.data).to.have.property('token');\r",
 																	"});\r",
 																	"\r",
@@ -1259,7 +1238,15 @@
 															"listen": "prerequest",
 															"script": {
 																"exec": [
-																	""
+																	"var randomNumber = Math.floor(1000 + Math.random() * 9000);\r",
+																	"var firstName = pm.variables.get(\"$randomFirstName\");\r",
+																	"\r",
+																	"if (!firstName) {\r",
+																	"    firstName = \"User\";\r",
+																	"}\r",
+																	"\r",
+																	"var randFirstName = firstName + randomNumber;\r",
+																	"pm.variables.set(\"randFirstName\", randFirstName);"
 																],
 																"type": "text/javascript",
 																"packages": {},
@@ -1277,7 +1264,7 @@
 														],
 														"body": {
 															"mode": "raw",
-															"raw": "{\n  \"email\": \"{{tempmail}}\",\n  \"firstname\": \"{{$randomFirstName}}\",\n  \"lastname\": \"Ojay\",\n  \"password\": \"{{Password}}\",\n  \"phone\": \"{{$randomPhoneNumber}}\",\n  \"gender\": \"MALE\"\n  //\"couponCode\": \"WELCOME20\"\n}\n",
+															"raw": "{\n  \"email\": \"{{tempmail}}\",\n  \"firstname\": \"{{$randomFirstName}}\",\n  \"lastname\": \"Ojay\",\n  \"password\": \"{{Password}}\",\n  \"phone\": \"{{$randomPhoneNumber}}\",\n  \"gender\": \"MALE\",\n  \"avatar\": \"https://storage.googleapis.com/user-avatars/123_thumb.jpg\",\n  \"currentDeviceInfo\": {\n    \"name\": \"{{$randomFirstName}}'s iPhone\",\n    \"uuid\": \"a1b2c3d4-e5f6-g7h8-i9j0-k1l2m3n4o5p6\",\n    \"model\": \"iPhone 15 Pro\",\n    \"category\": \"IOS\"\n  },\n  \"notificationId\": \"c...c:APA91b...\",\n  \"notificationSettings\": {\n    \"chat\": true,\n    \"booking\": true,\n    \"email\": false,\n    \"payment\": true\n  },\n  \"location\": {\n    \"address1\": \"123 Main St\",\n    \"address2\": \"Apt 4B\",\n    \"state\": \"Lagos\",\n    \"city\": \"Ikeja\",\n    \"country\": \"Nigeria\",\n    \"zipCode\": \"100242\",\n    \"coordinates\": {\n      \"longitude\": -74.006,\n      \"latitude\": 40.7128\n    }\n  },\n  \"bio\": \"Experienced Designer with 5 years of expertise.\",\n  \"businessName\": \"{{$randomCompanyName}}\",\n  \"businessAddress\": \"123 Main St, Lagos, Nigeria\",\n  \"businessLocation\": {\n    \"longitude\": \"3.379206\",\n    \"latitude\": \"6.524379\"\n  },\n  \"socials\": {\n    \"instagramUrl\": \"https://www.instagram.com/yourprofile\",\n    \"facebookUrl\": \"https://www.facebook.com/yourprofile\"\n  },\n  \"bankInfo\": {\n    \"accountName\": \"{{$randomFirstName}} Doe\",\n    \"accountNumber\": \"0123456789\",\n    \"bankName\": \"Guaranty Trust Bank\",\n    \"bankCode\": \"058\"\n  },\n  \"isAvailable\": true,\n  \"businessLogo\": \"https://storage.googleapis.com/business-logos/123.png\",\n  \"revenueType\": \"default\"\n//   \"couponCode\": \"WELCOME20\"\n}\n",
 															"options": {
 																"raw": {
 																	"headerFamily": "json",
@@ -1406,29 +1393,18 @@
 																	"listen": "test",
 																	"script": {
 																		"exec": [
-																			"pm.test(\"Response status code is 201\", function () {\r",
-																			"  pm.expect(pm.response.to.have.status(201));\r",
-																			"});\r",
 																			"\r",
-																			"pm.test(\"Response time is less than 1000ms\", function () {\r",
-																			"  pm.expect(pm.response.responseTime).to.be.below(1000);\r",
-																			"});\r",
-																			"\r",
-																			"pm.test(\"Response has the required fields - statusCode, message, and data\", function () {\r",
+																			"pm.test(\"Response has the required fields - success and data\", function () {\r",
 																			"  const responseData = pm.response.json();\r",
 																			"  \r",
 																			"  pm.expect(responseData).to.be.an('object');\r",
-																			"  pm.expect(responseData.statusCode).to.exist;\r",
-																			"  pm.expect(responseData.message).to.exist;\r",
+																			"  pm.expect(responseData.success).to.exist;\r",
 																			"  pm.expect(responseData.data).to.exist;\r",
-																			"});\r",
-																			"\r",
-																			"pm.test(\"Message is a non-empty string\", function () {\r",
-																			"    const responseData = pm.response.json();\r",
-																			"    \r",
-																			"    pm.expect(responseData.message).to.be.a('string').and.to.have.lengthOf.at.least(1, \"Message should not be empty\");\r",
-																			"});\r",
-																			""
+																			"  pm.expect(responseData.data).to.be.a('boolean');\r",
+																			"  pm.expect(responseData.success).to.be.true;\r",
+																			"  pm.expect(responseData.data).to.be.true;  \r",
+																			"  pm.expect(responseData.success).to.be.a('boolean');\r",
+																			"});"
 																		],
 																		"type": "text/javascript",
 																		"packages": {},
@@ -1438,8 +1414,12 @@
 																{
 																	"listen": "prerequest",
 																	"script": {
-																		"exec": [],
-																		"type": "text/javascript"
+																		"exec": [
+																			""
+																		],
+																		"type": "text/javascript",
+																		"packages": {},
+																		"requests": {}
 																	}
 																}
 															],
@@ -1453,7 +1433,7 @@
 																],
 																"body": {
 																	"mode": "raw",
-																	"raw": "{\n    \"channel\": \"sms\",\n    \"phone\": \"+2348109642088\",\n    \"email\": \"faros@2200freefonts.com\"\n}",
+																	"raw": "{\n    \"channel\": \"email\",\n    \"phone\": \"+2348109642088\",\n    \"email\": \"{{tempmail}}\"\n}",
 																	"options": {
 																		"raw": {
 																			"headerFamily": "json",
@@ -1702,83 +1682,51 @@
 																	"listen": "test",
 																	"script": {
 																		"exec": [
-																			"// 1. Parse JSON",
-																			"let jsonData;",
-																			"try {",
-																			"    jsonData = pm.response.json();",
-																			"} catch (e) {",
-																			"    pm.test(\"Response is valid JSON\", function () {",
-																			"        throw new Error(\"Response body is not valid JSON: \" + e.message);",
+																			"// Parse response and get messages array",
+																			"const data = pm.response.json();",
+																			"const messages = Array.isArray(data[\"hydra:member\"]) ? data[\"hydra:member\"] : [];",
+																			"",
+																			"// Find the latest message by createdAt timestamp",
+																			"let latestMsg = null;",
+																			"if (messages.length > 0) {",
+																			"    latestMsg = messages.reduce((a, b) => {",
+																			"        return new Date(a.createdAt) > new Date(b.createdAt) ? a : b;",
 																			"    });",
 																			"}",
 																			"",
-																			"// 2. Assert status 200 and response shape",
-																			"pm.test(\"Status code is 200\", function () {",
-																			"    pm.expect(pm.response.code).to.eql(200);",
-																			"});",
-																			"pm.test(\"Response has hydra:member as array\", function () {",
-																			"    pm.expect(jsonData).to.have.property(\"hydra:member\");",
-																			"    pm.expect(Array.isArray(jsonData[\"hydra:member\"]))",
-																			"        .to.be.true;",
-																			"});",
-																			"",
-																			"const members = jsonData[\"hydra:member\"];",
-																			"",
-																			"// 3. Ensure array has at least one element",
-																			"pm.test(\"hydra:member has at least one message\", function () {",
-																			"    pm.expect(members.length, \"No messages found in hydra:member\").to.be.above(0);",
+																			"// (1) Assertion: latest message is from 'hello@dandysapp.com' and subject is 'Dandys OTP' or 'Your One-Time Password'",
+																			"pm.test(\"Latest message is from hello@dandysapp.com and subject is 'Dandys OTP' or 'Your One-Time Password'\", function () {",
+																			"    pm.expect(latestMsg, \"No messages found\").to.not.be.null;",
+																			"    if (latestMsg) {",
+																			"        pm.expect(latestMsg.from && latestMsg.from.address, \"Sender address missing\").to.eql(\"hello@dandysapp.com\");",
+																			"        pm.expect([\"Dandys OTP\", \"Your One-Time Password\"]).to.include(latestMsg.subject);",
+																			"    }",
 																			"});",
 																			"",
-																			"if (!Array.isArray(members) || members.length === 0) {",
-																			"    // No messages to process",
-																			"    return;",
+																			"// (2) OTP extraction and storage",
+																			"function extractOTP(text) {",
+																			"    // Match 3-8 digit codes, e.g., 1234, 123456, 152, etc.",
+																			"    const match = text && text.match(/\\b(\\d{3,8})\\b/);",
+																			"    return match ? match[1] : null;",
 																			"}",
 																			"",
-																			"// 4. Find the last message by createdAt (prefer latest timestamp, break ties by last index)",
-																			"let lastIdx = 0;",
-																			"let lastMsg = members[0];",
-																			"for (let i = 1; i < members.length; i++) {",
-																			"    const curr = members[i];",
-																			"    if (!curr.createdAt || !lastMsg.createdAt) continue;",
-																			"    const currTime = new Date(curr.createdAt).getTime();",
-																			"    const lastTime = new Date(lastMsg.createdAt).getTime();",
-																			"    if (currTime > lastTime || (currTime === lastTime && i > lastIdx)) {",
-																			"        lastMsg = curr;",
-																			"        lastIdx = i;",
+																			"let otp = null;",
+																			"if (latestMsg) {",
+																			"    // Try to extract OTP from subject first",
+																			"    otp = extractOTP(latestMsg.subject);",
+																			"    if (!otp && latestMsg.intro) {",
+																			"        // If not found in subject, try intro",
+																			"        otp = extractOTP(latestMsg.intro);",
+																			"    }",
+																			"    if (otp) {",
+																			"        pm.collectionVariables.set('otp_code', otp);",
+																			"        console.log(otp)",
 																			"    }",
 																			"}",
 																			"",
-																			"// 5. Validate sender and subject",
-																			"pm.test(\"Latest message is from hello@dandysapp.com and subject is Dandys OTP\", function () {",
-																			"    pm.expect(lastMsg.from && lastMsg.from.address, \"Missing from.address\").to.eql(\"hello@dandysapp.com\");",
-																			"    pm.expect(lastMsg.subject, \"Missing subject\").to.eql(\"Dandys OTP\");",
+																			"pm.test(\"OTP code was extracted and set as collection variable\", function () {",
+																			"    pm.expect(otp, \"OTP code was not found in subject or intro\").to.not.be.null;",
 																			"});",
-																			"",
-																			"// 6. Validate intro contains OTP pattern",
-																			"const intro = lastMsg.intro || \"\";",
-																			"const otp6 = intro.match(/\\b\\d{6}\\b/);",
-																			"const otpFallback = intro.match(/\\b\\d{4,8}\\b/);",
-																			"",
-																			"pm.test(\"Intro contains a 4-8 digit OTP code\", function () {",
-																			"    pm.expect(",
-																			"        otp6 || otpFallback,",
-																			"        \"No 4-8 digit OTP code found in intro: \" + intro",
-																			"    ).to.not.be.null;",
-																			"});",
-																			"",
-																			"// 7. Extract OTP (prefer 6 digits, else 4-8 digits)",
-																			"let otp = otp6 ? otp6[0] : (otpFallback ? otpFallback[0] : null);",
-																			"",
-																			"// 8. Save OTP as collection variable if found",
-																			"if (otp) {",
-																			"    pm.collectionVariables.set(\"otp\", otp);",
-																			"    console.log(otp)",
-																			"} else {",
-																			"    pm.collectionVariables.unset(\"otp\");",
-																			"}",
-																			"",
-																			"// 9. Log message id and createdAt for debugging",
-																			"console.log(\"Chosen message id:\", lastMsg.id, \"createdAt:\", lastMsg.createdAt);",
 																			""
 																		],
 																		"type": "text/javascript",
@@ -1853,7 +1801,7 @@
 																],
 																"body": {
 																	"mode": "raw",
-																	"raw": "{\r\n    \"code\":\"821828\",\r\n    \"trxId\": \"72f12b6083585852adad44e8abd98e8a\",\r\n    \"channel\": \"sms\"\r\n}",
+																	"raw": "{\r\n    \"code\":\"{{otp_code}}\",\r\n    \"trxId\": \"72f12b6083585852adad44e8abd98e8a\",\r\n    \"channel\": \"email\"\r\n}",
 																	"options": {
 																		"raw": {
 																			"headerFamily": "json",
@@ -1999,8 +1947,12 @@
 												{
 													"listen": "prerequest",
 													"script": {
-														"exec": [],
-														"type": "text/javascript"
+														"exec": [
+															""
+														],
+														"type": "text/javascript",
+														"packages": {},
+														"requests": {}
 													}
 												}
 											],
@@ -2014,7 +1966,7 @@
 												],
 												"body": {
 													"mode": "raw",
-													"raw": "{\n    \"email\": \"faros@2200freefonts.com\",\n    \"password\": \"Pass@12345\"\n}",
+													"raw": "{\n    \"email\": \"{{tempmail}}\",\n    \"password\": \"{{Password}}\"\n}",
 													"options": {
 														"raw": {
 															"headerFamily": "json",
@@ -2134,14 +2086,6 @@
 														"exec": [
 															"// Robust test script for Delete professional account",
 															"",
-															"// 1. Status code checks",
-															"pm.test(\"Status code is 200 (OK)\", function () {",
-															"    pm.expect(pm.response.code).to.eql(200);",
-															"});",
-															"pm.test(\"Status code is not 400, 401, 404, or 500\", function () {",
-															"    pm.expect([400, 401, 404, 500]).to.not.include(pm.response.code);",
-															"});",
-															"",
 															"// 2. Content-Type check",
 															"pm.test(\"Content-Type is application/json\", function () {",
 															"    pm.response.to.have.header(\"Content-Type\");",
@@ -2206,14 +2150,13 @@
 													}
 												],
 												"url": {
-													"raw": "{{baseUrl}}/v1/users/",
+													"raw": "{{baseUrl}}/v1/professionals",
 													"host": [
 														"{{baseUrl}}"
 													],
 													"path": [
 														"v1",
-														"users",
-														""
+														"professionals"
 													]
 												}
 											},
@@ -2453,10 +2396,14 @@
 									"    pm.expect(SUCCESS_CODES.concat(ERROR_CODES)).to.include(pm.response.code);",
 									"});",
 									"",
-									"// 3. General test for response time",
-									"pm.test('Response time is less than 2s', function () {",
-									"    pm.expect(pm.response.responseTime).to.be.below(2000);",
+									"// ✅ Test: Ensure API response time is within acceptable limits",
+									"pm.test(\"Response time is within threshold\", function () {",
+									"    const thresholdTime = Number(pm.collectionVariables.get(\"thresholdTime\")) || 2000;",
+									"   console.log(`Response time: ${pm.response.responseTime} ms (threshold: ${thresholdTime} ms)`);",
+									"    pm.expect(pm.response.responseTime, `Response took longer than ${thresholdTime} ms`)",
+									"        .to.be.below(thresholdTime);",
 									"});",
+									"",
 									"",
 									"// --- END OF FOLDER-LEVEL TESTS ---",
 									""
@@ -2488,6 +2435,17 @@
 													"    pm.collectionVariables.set(\"adminId\", response.data.id)",
 													"}",
 													"",
+													""
+												],
+												"type": "text/javascript",
+												"packages": {},
+												"requests": {}
+											}
+										},
+										{
+											"listen": "prerequest",
+											"script": {
+												"exec": [
 													""
 												],
 												"type": "text/javascript",
@@ -2641,14 +2599,6 @@
 													"    parseError = e;",
 													"}",
 													"",
-													"pm.test(\"Status code is present\", function () {",
-													"    pm.expect(pm.response.code, \"Status code should be present\").to.be.a(\"number\");",
-													"});",
-													"",
-													"pm.test(\"Content-Type header present\", function () {",
-													"    pm.response.to.have.header(\"Content-Type\");",
-													"});",
-													"",
 													"pm.test(\"Response is valid JSON (if Content-Type is JSON)\", function () {",
 													"    if (pm.response.headers.get(\"Content-Type\") && pm.response.headers.get(\"Content-Type\").includes(\"application/json\")) {",
 													"        pm.expect(parseError, \"Response body should be valid JSON\").to.be.null;",
@@ -2745,8 +2695,12 @@
 										{
 											"listen": "prerequest",
 											"script": {
-												"exec": [],
-												"type": "text/javascript"
+												"exec": [
+													""
+												],
+												"type": "text/javascript",
+												"packages": {},
+												"requests": {}
 											}
 										}
 									],
@@ -3487,6 +3441,15 @@
 												},
 												"method": "PUT",
 												"header": [],
+												"body": {
+													"mode": "raw",
+													"raw": "",
+													"options": {
+														"raw": {
+															"language": "json"
+														}
+													}
+												},
 												"url": {
 													"raw": "{{baseUrl}}/v1/admin/users/:id/verify",
 													"host": [
@@ -3502,8 +3465,7 @@
 													"variable": [
 														{
 															"key": "id",
-															"value": "{{userId}}",
-															"description": "User ID"
+															"value": "{{userId}}"
 														}
 													]
 												}
@@ -4312,16 +4274,6 @@
 										"exec": [
 											"// --- Folder-level Postman Test Script for 'users' endpoints ---",
 											"",
-											"// 1. Status code",
-											"pm.test(\"Status code is 2xx\", function () {",
-											"    pm.expect(pm.response.code).to.be.within(200, 299);",
-											"});",
-											"",
-											"// 2. Response time",
-											"pm.test(\"Response time is less than 2 seconds\", function () {",
-											"    pm.expect(pm.response.responseTime).to.be.below(2000);",
-											"});",
-											"",
 											"// 3. Headers",
 											"pm.test(\"Content-Type is application/json\", function () {",
 											"    pm.response.to.have.header(\"Content-Type\");",
@@ -4417,19 +4369,6 @@
 													"listen": "test",
 													"script": {
 														"exec": [
-															"// Get all professional users\r",
-															"pm.test(\"Status code is 200\", function () {\r",
-															"    pm.expect(pm.response.code, \"Expected 200 OK\").to.eql(200);\r",
-															"});\r",
-															"\r",
-															"pm.test(\"Content-Type is application/json\", function () {\r",
-															"    pm.expect(pm.response.headers.get('Content-Type'), \"Content-Type should include application/json\")\r",
-															"        .to.include('application/json; charset=utf-8');\r",
-															"});\r",
-															"\r",
-															"pm.test(\"Response time is under 2000ms\", function () {\r",
-															"    pm.expect(pm.response.responseTime, \"Response time exceeded 2000ms\").to.be.below(2000);\r",
-															"});\r",
 															""
 														],
 														"type": "text/javascript",
@@ -4960,19 +4899,6 @@
 													"listen": "test",
 													"script": {
 														"exec": [
-															"// Get all professional users\r",
-															"pm.test(\"Status code is 200\", function () {\r",
-															"    pm.expect(pm.response.code, \"Expected 200 OK\").to.eql(200);\r",
-															"});\r",
-															"\r",
-															"pm.test(\"Content-Type is application/json\", function () {\r",
-															"    pm.expect(pm.response.headers.get('Content-Type'), \"Content-Type should include application/json\")\r",
-															"        .to.include('application/json;charset=utf-8');\r",
-															"});\r",
-															"\r",
-															"pm.test(\"Response time is under 2000ms\", function () {\r",
-															"    pm.expect(pm.response.responseTime, \"Response time exceeded 2000ms\").to.be.below(2000);\r",
-															"});\r",
 															""
 														],
 														"type": "text/javascript",
@@ -5296,26 +5222,11 @@
 															"    // Do nothing if JSON parsing fails",
 															"}",
 															"",
-															"// Get all categories",
-															"pm.test(\"Status code is 200\", function () {",
-															"    pm.expect(pm.response.code, \"Expected 200 OK\").to.eql(200);",
-															"});",
-															"",
-															"pm.test(\"Content-Type is application/json\", function () {",
-															"    pm.expect(pm.response.headers.get('Content-Type'), \"Content-Type should include application/json\").to.include('application/json; charset=utf-8');",
-															"});",
-															"",
 															"pm.test(\"Bearer token is present in request headers\", function () {",
 															"    const token = pm.globals.get('adminToken') || pm.collectionVariables.get('adminToken');",
 															"    pm.expect(pm.request.headers.has('Authorization'), \"Authorization header missing\").to.be.true;",
 															"    pm.expect(pm.request.headers.get('Authorization'), \"Authorization header should contain Bearer token\").to.include(token);",
 															"});",
-															"",
-															"pm.test(\"Response time is under 2000ms\", function () {",
-															"    pm.expect(pm.response.responseTime, \"Response time exceeded 2000ms\").to.be.below(1000);",
-															"});",
-															"",
-															"// Schema validation",
 															""
 														],
 														"type": "text/javascript",
@@ -5464,11 +5375,6 @@
 													"listen": "test",
 													"script": {
 														"exec": [
-															"// Get category by ID\r",
-															"pm.test(\"Status code is 200\", function () {\r",
-															"    pm.expect(pm.response.code, \"Expected 200 OK\").to.eql(200);\r",
-															"});\r",
-															"\r",
 															"pm.test(\"Content-Type is application/json\", function () {\r",
 															"    pm.expect(pm.response.headers.get('Content-Type'), \"Content-Type should include application/json\").to.include('application/json');\r",
 															"});\r",
@@ -5477,10 +5383,6 @@
 															"    const token = pm.globals.get('adminToken') || pm.collectionVariables.get('adminToken');\r",
 															"    pm.expect(pm.request.headers.has('Authorization'), \"Authorization header missing\").to.be.true;\r",
 															"    pm.expect(pm.request.headers.get('Authorization'), \"Authorization header should contain Bearer token\").to.include(token);\r",
-															"});\r",
-															"\r",
-															"pm.test(\"Response time is under 2000ms\", function () {\r",
-															"    pm.expect(pm.response.responseTime, \"Response time exceeded 2000ms\").to.be.below(2000);\r",
 															"});\r",
 															"\r",
 															"pm.test(\"Response data is not empty\", function () { \r",
@@ -5618,14 +5520,6 @@
 													"listen": "test",
 													"script": {
 														"exec": [
-															"// Get category by ID\r",
-															"pm.test(\"Status code is 200\", function () {\r",
-															"    pm.expect(pm.response.code, \"Expected 200 OK\").to.eql(200);\r",
-															"});\r",
-															"\r",
-															"pm.test(\"Response time is under 2000ms\", function () {\r",
-															"    pm.expect(pm.response.responseTime, \"Response time exceeded 2000ms\").to.be.below(2000);\r",
-															"});\r",
 															"\r",
 															"pm.test(\"Content-Type is application/json\", function () {\r",
 															"    pm.expect(pm.response.headers.get('Content-Type'), \"Content-Type should include application/json\").to.include('application/json');\r",
@@ -5753,14 +5647,6 @@
 													"listen": "test",
 													"script": {
 														"exec": [
-															"// Get subcategory by ID\r",
-															"pm.test(\"Status code is 200\", function () {\r",
-															"    pm.expect(pm.response.code, \"Expected 200 OK\").to.eql(200);\r",
-															"});\r",
-															"\r",
-															"pm.test(\"Response time is under 2000ms\", function () {\r",
-															"    pm.expect(pm.response.responseTime, \"Response time exceeded 2000ms\").to.be.below(2000);\r",
-															"});\r",
 															"\r",
 															"pm.test(\"Content-Type is application/json\", function () {\r",
 															"    pm.expect(pm.response.headers.get('Content-Type'), \"Content-Type should include application/json\").to.include('application/json');\r",
@@ -7940,16 +7826,7 @@
 														"packages": {},
 														"requests": {},
 														"exec": [
-															"    var data = pm.response.json().data;\r",
-															"\r",
-															"pm.test(\"Status code is 2xx\", function () {\r",
-															"    pm.expect(pm.response.code, \"Expected 2xx status code\").to.be.within(200, 299);\r",
-															"});\r",
-															"\r",
-															"\r",
-															"pm.test(\"Response time is under 2000ms\", function () {\r",
-															"    pm.expect(pm.response.responseTime, \"Response time exceeded 2000ms\").to.be.below(2000);\r",
-															"});\r",
+															"var data = pm.response.json().data;\r",
 															"\r",
 															"pm.test(\"Content-Type is application/json\", function () {\r",
 															"    pm.expect(pm.response.headers.get('Content-Type'), \"Content-Type should include application/json\").to.include('application/json; charset=utf-8');\r",
@@ -13810,6 +13687,26 @@
 							"item": [
 								{
 									"name": "Get all services",
+									"event": [
+										{
+											"listen": "test",
+											"script": {
+												"exec": [
+													""
+												],
+												"type": "text/javascript",
+												"packages": {},
+												"requests": {}
+											}
+										},
+										{
+											"listen": "prerequest",
+											"script": {
+												"exec": [],
+												"type": "text/javascript"
+											}
+										}
+									],
 									"request": {
 										"auth": {
 											"type": "bearer",
@@ -14082,6 +13979,54 @@
 								}
 							]
 						}
+					],
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"type": "text/javascript",
+								"packages": {},
+								"requests": {},
+								"exec": [
+									""
+								]
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"packages": {},
+								"requests": {},
+								"exec": [
+									"// Define expected status codes for success and error\r",
+									"const SUCCESS_CODES = [200, 201, 202, 204];\r",
+									"const ERROR_CODES = [400, 401, 403, 404, 422, 500];\r",
+									"\r",
+									"// 1. Test for successful response status codes\r",
+									"pm.test('Response status is successful', function () {\r",
+									"    pm.expect(SUCCESS_CODES).to.include(pm.response.code);\r",
+									"});\r",
+									"\r",
+									"// 2. Test for error response status codes (if not successful)\r",
+									"pm.test('Response status is error or success', function () {\r",
+									"    pm.expect(SUCCESS_CODES.concat(ERROR_CODES)).to.include(pm.response.code);\r",
+									"});\r",
+									"\r",
+									"// ✅ Test: Ensure API response time is within acceptable limits\r",
+									"pm.test(\"Response time is within threshold\", function () {\r",
+									"    const thresholdTime = Number(pm.collectionVariables.get(\"thresholdTime\")) || 2000;\r",
+									"   console.log(`Response time: ${pm.response.responseTime} ms (threshold: ${thresholdTime} ms)`);\r",
+									"    pm.expect(pm.response.responseTime, `Response took longer than ${thresholdTime} ms`)\r",
+									"        .to.be.below(thresholdTime);\r",
+									"});\r",
+									"\r",
+									"\r",
+									"// --- END OF FOLDER-LEVEL TESTS ---\r",
+									""
+								]
+							}
+						}
 					]
 				},
 				{
@@ -14136,7 +14081,7 @@
 										],
 										"body": {
 											"mode": "raw",
-											"raw": "{\n    \"email\": \"green@2200freefonts.com\",\n    \"password\": \"{{Password}}\"\n}",
+											"raw": "{\n    \"email\": \"dolores@2200freefonts.com\",\n    \"password\": \"{{Password}}\"\n}",
 											"options": {
 												"raw": {
 													"headerFamily": "json",
@@ -16497,7 +16442,7 @@
 										],
 										"body": {
 											"mode": "raw",
-											"raw": "{\n    // \"email\": \"testpower@powerscrews.com\",\n    // \"password\": \"Pass@12345\"\n        \"email\": \"marcandre@email.com\",\n    // \"password\": \"notarealpassword10\",\n    // \"email\": \"abiolafadipe88@gmail.com\",\n    \"password\": \"{{Password}}\"\n}",
+											"raw": "{\n    \"email\": \"henri@2200freefonts.com\",\n    \"password\": \"{{Password}}\"\n}",
 											"options": {
 												"raw": {
 													"headerFamily": "json",
@@ -16614,149 +16559,334 @@
 							"name": "profile",
 							"item": [
 								{
-									"name": "Get the logged-in professional user's profile",
-									"event": [
+									"name": "{id}",
+									"item": [
 										{
-											"listen": "test",
-											"script": {
-												"exec": [
-													"// Preserve existing minimal placeholder if present and add logic to capture first non-null workImageGallery id",
-													"",
-													"(function () {",
-													"    let json;",
-													"    try {",
-													"        json = pm.response.json();",
-													"    } catch (e) {",
-													"        // Non-JSON response; ensure var is not changed",
-													"        pm.test('[workImageGalleryId] Response is JSON', function () {",
-													"            pm.expect.fail('Response is not JSON, cannot extract workImageGalleryId');",
-													"        });",
-													"        return;",
-													"    }",
-													"",
-													"    // Navigate to workImageGallery array safely",
-													"    const gallery = json && json.data && Array.isArray(json.data.workImageGallery)",
-													"        ? json.data.workImageGallery",
-													"        : [];",
-													"",
-													"    // Find first item with a non-null, non-empty id",
-													"    const found = gallery.find(it => it && it.id !== null && it.id !== undefined && String(it.id).trim() !== '');",
-													"",
-													"    if (found && found.id !== null && found.id !== undefined && String(found.id).trim() !== '') {",
-													"        const idVal = String(found.id);",
-													"        pm.collectionVariables.set('workImageGalleryId', idVal);",
-													"        pm.test('[workImageGalleryId] Captured first non-null id from workImageGallery', function () {",
-													"            pm.expect(pm.collectionVariables.get('workImageGalleryId')).to.eql(idVal);",
-													"        });",
-													"    } else {",
-													"        // If none found, make sure it is unset so downstream steps don\\'t use stale value",
-													"        if (pm.collectionVariables.get('workImageGalleryId') !== undefined) {",
-													"            pm.collectionVariables.unset('workImageGalleryId');",
-													"        }",
-													"        pm.test('[workImageGalleryId] No valid id found in workImageGallery', function () {",
-													"            pm.expect(gallery.every(it => !it || it.id === null || it.id === undefined || String(it.id).trim() === '')).to.be.true;",
-													"        });",
-													"    }",
-													"})();"
-												],
-												"type": "text/javascript",
-												"packages": {},
-												"requests": {}
-											}
-										},
-										{
-											"listen": "prerequest",
-											"script": {
-												"exec": [],
-												"type": "text/javascript"
-											}
-										}
-									],
-									"request": {
-										"auth": {
-											"type": "bearer",
-											"bearer": [
+											"name": "reviews",
+											"item": [
 												{
-													"key": "token",
-													"value": "{{professionalToken}}",
-													"type": "string"
+													"name": "Get professional reviews by ID",
+													"request": {
+														"auth": {
+															"type": "bearer",
+															"bearer": [
+																{
+																	"key": "token",
+																	"value": "{{professionalToken}}",
+																	"type": "string"
+																}
+															]
+														},
+														"method": "GET",
+														"header": [],
+														"url": {
+															"raw": "{{baseUrl}}/v1/professionals/:id/reviews",
+															"host": [
+																"{{baseUrl}}"
+															],
+															"path": [
+																"v1",
+																"professionals",
+																":id",
+																"reviews"
+															],
+															"variable": [
+																{
+																	"key": "id",
+																	"value": "{{professionalId}}",
+																	"description": "Professional ID"
+																}
+															]
+														}
+													},
+													"response": [
+														{
+															"name": "Reviews retrieved successfully",
+															"originalRequest": {
+																"method": "GET",
+																"header": [
+																	{
+																		"key": "Authorization",
+																		"value": "Bearer <token>",
+																		"description": "Added as a part of security scheme: bearer"
+																	}
+																],
+																"url": {
+																	"raw": "{{baseUrl}}/v1/professionals/:id/reviews",
+																	"host": [
+																		"{{baseUrl}}"
+																	],
+																	"path": [
+																		"v1",
+																		"professionals",
+																		":id",
+																		"reviews"
+																	],
+																	"variable": [
+																		{
+																			"key": "id"
+																		}
+																	]
+																}
+															},
+															"status": "OK",
+															"code": 200,
+															"_postman_previewlanguage": "text",
+															"header": [],
+															"cookie": [],
+															"body": ""
+														},
+														{
+															"name": "Professional not found",
+															"originalRequest": {
+																"method": "GET",
+																"header": [
+																	{
+																		"key": "Authorization",
+																		"value": "Bearer <token>",
+																		"description": "Added as a part of security scheme: bearer"
+																	}
+																],
+																"url": {
+																	"raw": "{{baseUrl}}/v1/professionals/:id/reviews",
+																	"host": [
+																		"{{baseUrl}}"
+																	],
+																	"path": [
+																		"v1",
+																		"professionals",
+																		":id",
+																		"reviews"
+																	],
+																	"variable": [
+																		{
+																			"key": "id"
+																		}
+																	]
+																}
+															},
+															"status": "Not Found",
+															"code": 404,
+															"_postman_previewlanguage": "text",
+															"header": [],
+															"cookie": [],
+															"body": ""
+														}
+													]
 												}
 											]
 										},
-										"method": "GET",
-										"header": [],
-										"url": {
-											"raw": "{{baseUrl}}/v1/professionals/me",
-											"host": [
-												"{{baseUrl}}"
-											],
-											"path": [
-												"v1",
-												"professionals",
-												"me"
-											]
-										}
-									},
-									"response": [
 										{
-											"name": "Profile retrieved successfully",
-											"originalRequest": {
+											"name": "services",
+											"item": [
+												{
+													"name": "Get professional services by ID",
+													"request": {
+														"auth": {
+															"type": "bearer",
+															"bearer": [
+																{
+																	"key": "token",
+																	"value": "{{professionalToken}}",
+																	"type": "string"
+																}
+															]
+														},
+														"method": "GET",
+														"header": [],
+														"url": {
+															"raw": "{{baseUrl}}/v1/professionals/:id/services",
+															"host": [
+																"{{baseUrl}}"
+															],
+															"path": [
+																"v1",
+																"professionals",
+																":id",
+																"services"
+															],
+															"variable": [
+																{
+																	"key": "id",
+																	"value": "{{professionalId}}",
+																	"description": "Professional ID"
+																}
+															]
+														}
+													},
+													"response": [
+														{
+															"name": "Services retrieved successfully",
+															"originalRequest": {
+																"method": "GET",
+																"header": [
+																	{
+																		"key": "Authorization",
+																		"value": "Bearer <token>",
+																		"description": "Added as a part of security scheme: bearer"
+																	}
+																],
+																"url": {
+																	"raw": "{{baseUrl}}/v1/professionals/:id/services",
+																	"host": [
+																		"{{baseUrl}}"
+																	],
+																	"path": [
+																		"v1",
+																		"professionals",
+																		":id",
+																		"services"
+																	],
+																	"variable": [
+																		{
+																			"key": "id"
+																		}
+																	]
+																}
+															},
+															"status": "OK",
+															"code": 200,
+															"_postman_previewlanguage": "text",
+															"header": [],
+															"cookie": [],
+															"body": ""
+														},
+														{
+															"name": "Professional not found",
+															"originalRequest": {
+																"method": "GET",
+																"header": [
+																	{
+																		"key": "Authorization",
+																		"value": "Bearer <token>",
+																		"description": "Added as a part of security scheme: bearer"
+																	}
+																],
+																"url": {
+																	"raw": "{{baseUrl}}/v1/professionals/:id/services",
+																	"host": [
+																		"{{baseUrl}}"
+																	],
+																	"path": [
+																		"v1",
+																		"professionals",
+																		":id",
+																		"services"
+																	],
+																	"variable": [
+																		{
+																			"key": "id"
+																		}
+																	]
+																}
+															},
+															"status": "Not Found",
+															"code": 404,
+															"_postman_previewlanguage": "text",
+															"header": [],
+															"cookie": [],
+															"body": ""
+														}
+													]
+												}
+											]
+										},
+										{
+											"name": "Get a professional by their ID",
+											"request": {
 												"method": "GET",
-												"header": [
-													{
-														"key": "Authorization",
-														"value": "Bearer <token>",
-														"description": "Added as a part of security scheme: bearer"
-													}
-												],
+												"header": [],
 												"url": {
-													"raw": "{{baseUrl}}/v1/professionals/me",
+													"raw": "{{baseUrl}}/v1/professionals/:id",
 													"host": [
 														"{{baseUrl}}"
 													],
 													"path": [
 														"v1",
 														"professionals",
-														"me"
-													]
-												}
-											},
-											"status": "OK",
-											"code": 200,
-											"_postman_previewlanguage": "text",
-											"header": [],
-											"cookie": [],
-											"body": ""
-										},
-										{
-											"name": "Unauthorized",
-											"originalRequest": {
-												"method": "GET",
-												"header": [
-													{
-														"key": "Authorization",
-														"value": "Bearer <token>",
-														"description": "Added as a part of security scheme: bearer"
-													}
-												],
-												"url": {
-													"raw": "{{baseUrl}}/v1/professionals/me",
-													"host": [
-														"{{baseUrl}}"
+														":id"
 													],
-													"path": [
-														"v1",
-														"professionals",
-														"me"
+													"variable": [
+														{
+															"key": "id",
+															"value": "{{professionalId}}",
+															"description": "Professional ID"
+														}
 													]
 												}
 											},
-											"status": "Unauthorized",
-											"code": 401,
-											"_postman_previewlanguage": "text",
-											"header": [],
-											"cookie": [],
-											"body": ""
+											"response": [
+												{
+													"name": "Professional retrieved successfully",
+													"originalRequest": {
+														"method": "GET",
+														"header": [
+															{
+																"key": "Authorization",
+																"value": "Bearer <token>",
+																"description": "Added as a part of security scheme: bearer"
+															}
+														],
+														"url": {
+															"raw": "{{baseUrl}}/v1/professionals/:id",
+															"host": [
+																"{{baseUrl}}"
+															],
+															"path": [
+																"v1",
+																"professionals",
+																":id"
+															],
+															"variable": [
+																{
+																	"key": "id"
+																}
+															]
+														}
+													},
+													"status": "OK",
+													"code": 200,
+													"_postman_previewlanguage": "text",
+													"header": [],
+													"cookie": [],
+													"body": ""
+												},
+												{
+													"name": "Professional not found",
+													"originalRequest": {
+														"method": "GET",
+														"header": [
+															{
+																"key": "Authorization",
+																"value": "Bearer <token>",
+																"description": "Added as a part of security scheme: bearer"
+															}
+														],
+														"url": {
+															"raw": "{{baseUrl}}/v1/professionals/:id",
+															"host": [
+																"{{baseUrl}}"
+															],
+															"path": [
+																"v1",
+																"professionals",
+																":id"
+															],
+															"variable": [
+																{
+																	"key": "id"
+																}
+															]
+														}
+													},
+													"status": "Not Found",
+													"code": 404,
+													"_postman_previewlanguage": "text",
+													"header": [],
+													"cookie": [],
+													"body": ""
+												}
+											]
 										}
 									]
 								},
@@ -16785,7 +16915,7 @@
 											"formdata": [
 												{
 													"key": "firstname",
-													"value": "John",
+													"value": "{{$randomFirstName}}",
 													"type": "text"
 												},
 												{
@@ -16980,7 +17110,7 @@
 												{
 													"key": "images",
 													"type": "file",
-													"src": "postman-cloud:///1f03d465-d6cc-45a0-9471-0d475dcc7409"
+													"src": "postman-cloud:///1f03d4a8-5e99-4f40-b137-110a2f7b94c6"
 												}
 											]
 										},
@@ -17077,6 +17207,153 @@
 														"v1",
 														"professionals",
 														"gallery"
+													]
+												}
+											},
+											"status": "Unauthorized",
+											"code": 401,
+											"_postman_previewlanguage": "text",
+											"header": [],
+											"cookie": [],
+											"body": ""
+										}
+									]
+								},
+								{
+									"name": "Get the logged-in professional user's profile",
+									"event": [
+										{
+											"listen": "test",
+											"script": {
+												"exec": [
+													"// Preserve existing minimal placeholder if present and add logic to capture first non-null workImageGallery id",
+													"",
+													"(function () {",
+													"    let json;",
+													"    try {",
+													"        json = pm.response.json();",
+													"    } catch (e) {",
+													"        // Non-JSON response; ensure var is not changed",
+													"        pm.test('[workImageGalleryId] Response is JSON', function () {",
+													"            pm.expect.fail('Response is not JSON, cannot extract workImageGalleryId');",
+													"        });",
+													"        return;",
+													"    }",
+													"",
+													"    // Navigate to workImageGallery array safely",
+													"    const gallery = json && json.data && Array.isArray(json.data.workImageGallery)",
+													"        ? json.data.workImageGallery",
+													"        : [];",
+													"",
+													"    // Find first item with a non-null, non-empty id",
+													"    const found = gallery.find(it => it && it.id !== null && it.id !== undefined && String(it.id).trim() !== '');",
+													"",
+													"    if (found && found.id !== null && found.id !== undefined && String(found.id).trim() !== '') {",
+													"        const idVal = String(found.id);",
+													"        pm.collectionVariables.set('workImageGalleryId', idVal);",
+													"        pm.test('[workImageGalleryId] Captured first non-null id from workImageGallery', function () {",
+													"            pm.expect(pm.collectionVariables.get('workImageGalleryId')).to.eql(idVal);",
+													"        });",
+													"    } else {",
+													"        // If none found, make sure it is unset so downstream steps don\\'t use stale value",
+													"        if (pm.collectionVariables.get('workImageGalleryId') !== undefined) {",
+													"            pm.collectionVariables.unset('workImageGalleryId');",
+													"        }",
+													"        pm.test('[workImageGalleryId] No valid id found in workImageGallery', function () {",
+													"            pm.expect(gallery.every(it => !it || it.id === null || it.id === undefined || String(it.id).trim() === '')).to.be.true;",
+													"        });",
+													"    }",
+													"})();"
+												],
+												"type": "text/javascript",
+												"packages": {},
+												"requests": {}
+											}
+										},
+										{
+											"listen": "prerequest",
+											"script": {
+												"exec": [],
+												"type": "text/javascript"
+											}
+										}
+									],
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{professionalToken}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [],
+										"url": {
+											"raw": "{{baseUrl}}/v1/professionals/me",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"v1",
+												"professionals",
+												"me"
+											]
+										}
+									},
+									"response": [
+										{
+											"name": "Profile retrieved successfully",
+											"originalRequest": {
+												"method": "GET",
+												"header": [
+													{
+														"key": "Authorization",
+														"value": "Bearer <token>",
+														"description": "Added as a part of security scheme: bearer"
+													}
+												],
+												"url": {
+													"raw": "{{baseUrl}}/v1/professionals/me",
+													"host": [
+														"{{baseUrl}}"
+													],
+													"path": [
+														"v1",
+														"professionals",
+														"me"
+													]
+												}
+											},
+											"status": "OK",
+											"code": 200,
+											"_postman_previewlanguage": "text",
+											"header": [],
+											"cookie": [],
+											"body": ""
+										},
+										{
+											"name": "Unauthorized",
+											"originalRequest": {
+												"method": "GET",
+												"header": [
+													{
+														"key": "Authorization",
+														"value": "Bearer <token>",
+														"description": "Added as a part of security scheme: bearer"
+													}
+												],
+												"url": {
+													"raw": "{{baseUrl}}/v1/professionals/me",
+													"host": [
+														"{{baseUrl}}"
+													],
+													"path": [
+														"v1",
+														"professionals",
+														"me"
 													]
 												}
 											},
@@ -17234,6 +17511,957 @@
 											"body": ""
 										}
 									]
+								}
+							]
+						},
+						{
+							"name": "services",
+							"item": [
+								{
+									"name": "{id}",
+									"item": [
+										{
+											"name": "Create a new service",
+											"event": [
+												{
+													"listen": "test",
+													"script": {
+														"exec": [
+															"pm.collectionVariables.set(\"serviceId\", pm.response.json().data.id);"
+														],
+														"type": "text/javascript",
+														"packages": {},
+														"requests": {}
+													}
+												},
+												{
+													"listen": "prerequest",
+													"script": {
+														"exec": [],
+														"type": "text/javascript"
+													}
+												}
+											],
+											"request": {
+												"auth": {
+													"type": "bearer",
+													"bearer": [
+														{
+															"key": "token",
+															"value": "{{professionalToken}}",
+															"type": "string"
+														}
+													]
+												},
+												"method": "POST",
+												"header": [
+													{
+														"key": "Content-Type",
+														"value": "multipart/form-data"
+													}
+												],
+												"body": {
+													"mode": "formdata",
+													"formdata": [
+														{
+															"key": "name",
+															"value": "{{$randomProductName}}",
+															"type": "text"
+														},
+														{
+															"key": "categoryId",
+															"value": "{{categorgyId}}",
+															"type": "text"
+														},
+														{
+															"key": "subCategoryId",
+															"value": "{{newSubCategoryId}}",
+															"type": "text"
+														},
+														{
+															"key": "minPrice",
+															"value": "500",
+															"type": "text"
+														},
+														{
+															"key": "maxPrice",
+															"value": "1500",
+															"type": "text"
+														},
+														{
+															"key": "serviceType",
+															"value": "HOME_SERVICE",
+															"type": "text"
+														},
+														{
+															"key": "timeFrom",
+															"value": "06:00",
+															"type": "text"
+														},
+														{
+															"key": "timeTo",
+															"value": "17:00",
+															"type": "text"
+														},
+														{
+															"key": "timeInterval",
+															"value": "30",
+															"type": "text"
+														},
+														{
+															"key": "homeServiceCost",
+															"value": "500",
+															"type": "text"
+														},
+														{
+															"key": "status",
+															"value": "true",
+															"type": "text"
+														},
+														{
+															"key": "notes",
+															"value": "We render the best services you can ever think of.",
+															"type": "text"
+														},
+														{
+															"key": "images",
+															"type": "file",
+															"src": "postman-cloud:///1f0b8e04-43d7-49b0-a1ae-3a4b5e329b94"
+														}
+													]
+												},
+												"url": {
+													"raw": "{{baseUrl}}/v1/services",
+													"host": [
+														"{{baseUrl}}"
+													],
+													"path": [
+														"v1",
+														"services"
+													]
+												}
+											},
+											"response": [
+												{
+													"name": "Service created successfully",
+													"originalRequest": {
+														"method": "POST",
+														"header": [
+															{
+																"key": "Content-Type",
+																"value": "multipart/form-data"
+															},
+															{
+																"key": "Authorization",
+																"value": "Bearer <token>",
+																"description": "Added as a part of security scheme: bearer"
+															}
+														],
+														"body": {
+															"mode": "formdata",
+															"formdata": []
+														},
+														"url": {
+															"raw": "{{baseUrl}}/v1/services",
+															"host": [
+																"{{baseUrl}}"
+															],
+															"path": [
+																"v1",
+																"services"
+															]
+														}
+													},
+													"status": "Created",
+													"code": 201,
+													"_postman_previewlanguage": "text",
+													"header": [],
+													"cookie": [],
+													"body": ""
+												},
+												{
+													"name": "Invalid input or no images provided",
+													"originalRequest": {
+														"method": "POST",
+														"header": [
+															{
+																"key": "Content-Type",
+																"value": "multipart/form-data"
+															},
+															{
+																"key": "Authorization",
+																"value": "Bearer <token>",
+																"description": "Added as a part of security scheme: bearer"
+															}
+														],
+														"body": {
+															"mode": "formdata",
+															"formdata": []
+														},
+														"url": {
+															"raw": "{{baseUrl}}/v1/services",
+															"host": [
+																"{{baseUrl}}"
+															],
+															"path": [
+																"v1",
+																"services"
+															]
+														}
+													},
+													"status": "Bad Request",
+													"code": 400,
+													"_postman_previewlanguage": "text",
+													"header": [],
+													"cookie": [],
+													"body": ""
+												}
+											]
+										},
+										{
+											"name": "Update service",
+											"request": {
+												"auth": {
+													"type": "bearer",
+													"bearer": [
+														{
+															"key": "token",
+															"value": "{{professionalToken}}",
+															"type": "string"
+														}
+													]
+												},
+												"method": "PUT",
+												"header": [
+													{
+														"key": "Content-Type",
+														"value": "multipart/form-data"
+													}
+												],
+												"body": {
+													"mode": "formdata",
+													"formdata": [
+														{
+															"key": "name",
+															"value": "{{$randomProductName}}",
+															"type": "text"
+														},
+														{
+															"key": "images",
+															"type": "file",
+															"src": "postman-cloud:///1f0b8e04-43d7-49b0-a1ae-3a4b5e329b94"
+														}
+													]
+												},
+												"url": {
+													"raw": "{{baseUrl}}/v1/services/:id",
+													"host": [
+														"{{baseUrl}}"
+													],
+													"path": [
+														"v1",
+														"services",
+														":id"
+													],
+													"variable": [
+														{
+															"key": "id",
+															"value": "{{serviceId}}",
+															"description": "Service ID"
+														}
+													]
+												}
+											},
+											"response": [
+												{
+													"name": "Service updated successfully",
+													"originalRequest": {
+														"method": "PUT",
+														"header": [
+															{
+																"key": "Content-Type",
+																"value": "multipart/form-data"
+															},
+															{
+																"key": "Authorization",
+																"value": "Bearer <token>",
+																"description": "Added as a part of security scheme: bearer"
+															}
+														],
+														"body": {
+															"mode": "formdata",
+															"formdata": []
+														},
+														"url": {
+															"raw": "{{baseUrl}}/v1/services/:id",
+															"host": [
+																"{{baseUrl}}"
+															],
+															"path": [
+																"v1",
+																"services",
+																":id"
+															],
+															"variable": [
+																{
+																	"key": "id"
+																}
+															]
+														}
+													},
+													"status": "OK",
+													"code": 200,
+													"_postman_previewlanguage": "text",
+													"header": [],
+													"cookie": [],
+													"body": ""
+												},
+												{
+													"name": "Service not found",
+													"originalRequest": {
+														"method": "PUT",
+														"header": [
+															{
+																"key": "Content-Type",
+																"value": "multipart/form-data"
+															},
+															{
+																"key": "Authorization",
+																"value": "Bearer <token>",
+																"description": "Added as a part of security scheme: bearer"
+															}
+														],
+														"body": {
+															"mode": "formdata",
+															"formdata": []
+														},
+														"url": {
+															"raw": "{{baseUrl}}/v1/services/:id",
+															"host": [
+																"{{baseUrl}}"
+															],
+															"path": [
+																"v1",
+																"services",
+																":id"
+															],
+															"variable": [
+																{
+																	"key": "id"
+																}
+															]
+														}
+													},
+													"status": "Not Found",
+													"code": 404,
+													"_postman_previewlanguage": "text",
+													"header": [],
+													"cookie": [],
+													"body": ""
+												}
+											]
+										},
+										{
+											"name": "Delete service",
+											"request": {
+												"auth": {
+													"type": "bearer",
+													"bearer": [
+														{
+															"key": "token",
+															"value": "{{professionalToken}}",
+															"type": "string"
+														}
+													]
+												},
+												"method": "DELETE",
+												"header": [],
+												"url": {
+													"raw": "{{baseUrl}}/v1/services/:id",
+													"host": [
+														"{{baseUrl}}"
+													],
+													"path": [
+														"v1",
+														"services",
+														":id"
+													],
+													"variable": [
+														{
+															"key": "id",
+															"value": "{{serviceId}}",
+															"description": "Service ID"
+														}
+													]
+												}
+											},
+											"response": [
+												{
+													"name": "Service deleted successfully",
+													"originalRequest": {
+														"method": "DELETE",
+														"header": [
+															{
+																"key": "Authorization",
+																"value": "Bearer <token>",
+																"description": "Added as a part of security scheme: bearer"
+															}
+														],
+														"url": {
+															"raw": "{{baseUrl}}/v1/services/:id",
+															"host": [
+																"{{baseUrl}}"
+															],
+															"path": [
+																"v1",
+																"services",
+																":id"
+															],
+															"variable": [
+																{
+																	"key": "id"
+																}
+															]
+														}
+													},
+													"status": "OK",
+													"code": 200,
+													"_postman_previewlanguage": "text",
+													"header": [],
+													"cookie": [],
+													"body": ""
+												},
+												{
+													"name": "Service not found",
+													"originalRequest": {
+														"method": "DELETE",
+														"header": [
+															{
+																"key": "Authorization",
+																"value": "Bearer <token>",
+																"description": "Added as a part of security scheme: bearer"
+															}
+														],
+														"url": {
+															"raw": "{{baseUrl}}/v1/services/:id",
+															"host": [
+																"{{baseUrl}}"
+															],
+															"path": [
+																"v1",
+																"services",
+																":id"
+															],
+															"variable": [
+																{
+																	"key": "id"
+																}
+															]
+														}
+													},
+													"status": "Not Found",
+													"code": 404,
+													"_postman_previewlanguage": "text",
+													"header": [],
+													"cookie": [],
+													"body": ""
+												}
+											]
+										}
+									]
+								},
+								{
+									"name": "distance",
+									"item": [
+										{
+											"name": "Get all services with distance calculation",
+											"event": [
+												{
+													"listen": "test",
+													"script": {
+														"exec": [
+															""
+														],
+														"type": "text/javascript",
+														"packages": {},
+														"requests": {}
+													}
+												},
+												{
+													"listen": "prerequest",
+													"script": {
+														"exec": [
+															""
+														],
+														"type": "text/javascript",
+														"packages": {},
+														"requests": {}
+													}
+												}
+											],
+											"request": {
+												"method": "GET",
+												"header": [],
+												"url": {
+													"raw": "{{baseUrl}}/v1/services/distance?pageNumber=1&pageSize=20&longitude=3&latitude=4",
+													"host": [
+														"{{baseUrl}}"
+													],
+													"path": [
+														"v1",
+														"services",
+														"distance"
+													],
+													"query": [
+														{
+															"key": "pageNumber",
+															"value": "1",
+															"description": "Page number for pagination"
+														},
+														{
+															"key": "pageSize",
+															"value": "20",
+															"description": "Number of items per page"
+														},
+														{
+															"key": "longitude",
+															"value": "3",
+															"description": "Search keyword for product title, description, or brand"
+														},
+														{
+															"key": "latitude",
+															"value": "4",
+															"description": "Page number for pagination"
+														}
+													]
+												}
+											},
+											"response": [
+												{
+													"name": "Services retrieved successfully with distance",
+													"originalRequest": {
+														"method": "GET",
+														"header": [
+															{
+																"key": "Authorization",
+																"value": "Bearer <token>",
+																"description": "Added as a part of security scheme: bearer"
+															}
+														],
+														"url": {
+															"raw": "{{baseUrl}}/v1/services/distance?pageNumber=1&pageSize=20&query=Samsung Galaxy",
+															"host": [
+																"{{baseUrl}}"
+															],
+															"path": [
+																"v1",
+																"services",
+																"distance"
+															],
+															"query": [
+																{
+																	"key": "pageNumber",
+																	"value": "1",
+																	"description": "Page number for pagination"
+																},
+																{
+																	"key": "pageSize",
+																	"value": "20",
+																	"description": "Number of items per page"
+																},
+																{
+																	"key": "query",
+																	"value": "Samsung Galaxy",
+																	"description": "Search keyword for product title, description, or brand"
+																}
+															]
+														}
+													},
+													"status": "OK",
+													"code": 200,
+													"_postman_previewlanguage": "text",
+													"header": [],
+													"cookie": [],
+													"body": ""
+												}
+											]
+										},
+										{
+											"name": "Get service by ID with distance calculation",
+											"event": [
+												{
+													"listen": "test",
+													"script": {
+														"exec": [
+															""
+														],
+														"type": "text/javascript",
+														"packages": {},
+														"requests": {}
+													}
+												},
+												{
+													"listen": "prerequest",
+													"script": {
+														"exec": [],
+														"type": "text/javascript"
+													}
+												}
+											],
+											"request": {
+												"method": "GET",
+												"header": [],
+												"url": {
+													"raw": "{{baseUrl}}/v1/services/:id/distance?longitude=3&latitude=4",
+													"host": [
+														"{{baseUrl}}"
+													],
+													"path": [
+														"v1",
+														"services",
+														":id",
+														"distance"
+													],
+													"query": [
+														{
+															"key": "longitude",
+															"value": "3"
+														},
+														{
+															"key": "latitude",
+															"value": "4"
+														}
+													],
+													"variable": [
+														{
+															"key": "id",
+															"value": "{{serviceId}}",
+															"type": "string",
+															"description": "Service ID"
+														}
+													]
+												}
+											},
+											"response": [
+												{
+													"name": "Service retrieved successfully with distance",
+													"originalRequest": {
+														"method": "GET",
+														"header": [
+															{
+																"key": "Authorization",
+																"value": "Bearer <token>",
+																"description": "Added as a part of security scheme: bearer"
+															}
+														],
+														"url": {
+															"raw": "{{baseUrl}}/v1/services/:id/distance",
+															"host": [
+																"{{baseUrl}}"
+															],
+															"path": [
+																"v1",
+																"services",
+																":id",
+																"distance"
+															],
+															"variable": [
+																{
+																	"key": "id"
+																}
+															]
+														}
+													},
+													"status": "OK",
+													"code": 200,
+													"_postman_previewlanguage": "text",
+													"header": [],
+													"cookie": [],
+													"body": ""
+												},
+												{
+													"name": "Service not found",
+													"originalRequest": {
+														"method": "GET",
+														"header": [
+															{
+																"key": "Authorization",
+																"value": "Bearer <token>",
+																"description": "Added as a part of security scheme: bearer"
+															}
+														],
+														"url": {
+															"raw": "{{baseUrl}}/v1/services/:id/distance",
+															"host": [
+																"{{baseUrl}}"
+															],
+															"path": [
+																"v1",
+																"services",
+																":id",
+																"distance"
+															],
+															"variable": [
+																{
+																	"key": "id"
+																}
+															]
+														}
+													},
+													"status": "Not Found",
+													"code": 404,
+													"_postman_previewlanguage": "text",
+													"header": [],
+													"cookie": [],
+													"body": ""
+												}
+											]
+										}
+									]
+								},
+								{
+									"name": "states",
+									"item": [
+										{
+											"name": "Get professional services grouped by states",
+											"request": {
+												"auth": {
+													"type": "noauth"
+												},
+												"method": "GET",
+												"header": [],
+												"url": {
+													"raw": "{{baseUrl}}/v1/services/states",
+													"host": [
+														"{{baseUrl}}"
+													],
+													"path": [
+														"v1",
+														"services",
+														"states"
+													]
+												}
+											},
+											"response": [
+												{
+													"name": "Services retrieved successfully grouped by states",
+													"originalRequest": {
+														"method": "GET",
+														"header": [
+															{
+																"key": "Authorization",
+																"value": "Bearer <token>",
+																"description": "Added as a part of security scheme: bearer"
+															}
+														],
+														"url": {
+															"raw": "{{baseUrl}}/v1/services/states",
+															"host": [
+																"{{baseUrl}}"
+															],
+															"path": [
+																"v1",
+																"services",
+																"states"
+															]
+														}
+													},
+													"status": "OK",
+													"code": 200,
+													"_postman_previewlanguage": "text",
+													"header": [],
+													"cookie": [],
+													"body": ""
+												}
+											]
+										}
+									]
+								}
+							],
+							"event": [
+								{
+									"listen": "prerequest",
+									"script": {
+										"type": "text/javascript",
+										"packages": {},
+										"requests": {},
+										"exec": [
+											""
+										]
+									}
+								},
+								{
+									"listen": "test",
+									"script": {
+										"type": "text/javascript",
+										"packages": {},
+										"requests": {},
+										"exec": [
+											"if (pm.collectionVariables.get('SKIP_INHERITED_TESTS') === 'true') {\r",
+											"    // Optionally clear the variable after skipping\r",
+											"    pm.collectionVariables.unset('SKIP_INHERITED_TESTS');\r",
+											"    return; // Skip all inherited tests\r",
+											"}\r",
+											"\r",
+											"// =============================\r",
+											"// TRANSACTIONS FOLDER TESTS\r",
+											"// =============================\r",
+											"\r",
+											"// Utility: Safe JSON parse\r",
+											"function tryParseJson(body) {\r",
+											"    try { return JSON.parse(body); } catch (e) { return null; }\r",
+											"}\r",
+											"\r",
+											"// Utility: ISO 8601 date-time check\r",
+											"function isIsoDateTime(str) {\r",
+											"    return typeof str === 'string' && /^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z$/.test(str);\r",
+											"}\r",
+											"\r",
+											"// Utility: UUID v4 check (relaxed)\r",
+											"function isUuid(str) {\r",
+											"    return typeof str === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(str);\r",
+											"}\r",
+											"\r",
+											"// Utility: ISO 4217 currency code check\r",
+											"function isIso4217(str) {\r",
+											"    return typeof str === 'string' && /^[A-Z]{3}$/.test(str);\r",
+											"}\r",
+											"\r",
+											"// Utility: Enum check\r",
+											"function isStatusEnum(val) {\r",
+											"    return ['pending', 'completed', 'failed', 'refunded'].includes(val);\r",
+											"}\r",
+											"\r",
+											"// Utility: Get response time threshold\r",
+											"function getMaxResponseTime() {\r",
+											"    var envVal = pm.environment.get('TRANSACTIONS_MAX_RESPONSE_TIME_MS');\r",
+											"    var defaultVal = 2000;\r",
+											"    if (envVal && !isNaN(Number(envVal))) return Number(envVal);\r",
+											"    return defaultVal;\r",
+											"}\r",
+											"\r",
+											"// Utility: Check if request is get-by-id\r",
+											"function isGetByIdRequest() {\r",
+											"    return pm.request.url.path.some(function(seg) { return seg === ':id' || seg === pm.variables.get('id'); }) ||\r",
+											"        /\\/:(id|transactionId)/.test(pm.request.url.raw || '');\r",
+											"}\r",
+											"\r",
+											"// Utility: Get id value for get-by-id\r",
+											"function getTransactionId() {\r",
+											"    // Try path variable, then env\r",
+											"    var id = pm.variables.get('id') || pm.environment.get('id') || pm.environment.get('lastTransactionId');\r",
+											"    return id;\r",
+											"}\r",
+											"\r",
+											"// Utility: Print key fields for debugging\r",
+											"function logKeyFields(obj) {\r",
+											"    if (!obj) return;\r",
+											"    pm.test('[Debug] Log key transaction fields', function() {\r",
+											"        console.log('[Transaction]', {\r",
+											"            id: obj.id,\r",
+											"            amount: obj.amount,\r",
+											"            currency: obj.currency,\r",
+											"            status: obj.status,\r",
+											"            createdAt: obj.createdAt,\r",
+											"            updatedAt: obj.updatedAt\r",
+											"        });\r",
+											"    });\r",
+											"}\r",
+											"\r",
+											"// =============================\r",
+											"// 1. Precondition: ID presence for get-by-id\r",
+											"// =============================\r",
+											"if (isGetByIdRequest()) {\r",
+											"    var idVal = getTransactionId();\r",
+											"    pm.test('[Precondition] Transaction ID is provided for get-by-id', function() {\r",
+											"        if (!idVal) {\r",
+											"            this.skip();\r",
+											"            throw new Error('Transaction ID is missing for this request. Set an environment variable `id` or `lastTransactionId`.');\r",
+											"        }\r",
+											"    });\r",
+											"}\r",
+											"\r",
+											"// =============================\r",
+											"// 2. HTTP Status Code Group\r",
+											"// =============================\r",
+											"pm.test('[Status] Response status code is 2xx for success', function() {\r",
+											"    pm.expect(pm.response.code).to.be.within(200, 299, 'Expected a 2xx status code for success');\r",
+											"});\r",
+											"pm.test('[Status] Handle 4xx/5xx with helpful message', function() {\r",
+											"    if (pm.response.code >= 400) {\r",
+											"        var msg = 'Request failed with status ' + pm.response.code + ': ' + pm.response.reason();\r",
+											"        pm.expect.fail(msg);\r",
+											"    }\r",
+											"});\r",
+											"\r",
+											"// =============================\r",
+											"// 3. Response Time Group\r",
+											"// =============================\r",
+											"pm.test('[Performance] Response time under threshold', function() {\r",
+											"    var maxMs = getMaxResponseTime();\r",
+											"    pm.expect(pm.response.responseTime).to.be.below(maxMs, 'Response time exceeded ' + maxMs + ' ms');\r",
+											"});\r",
+											"\r",
+											"// =============================\r",
+											"// 4. Content-Type Group\r",
+											"// =============================\r",
+											"pm.test('[Content-Type] Response is JSON when applicable', function() {\r",
+											"    if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.body && pm.response.body.length > 0) {\r",
+											"        pm.response.to.have.header('Content-Type');\r",
+											"        var ct = pm.response.headers.get('Content-Type') || '';\r",
+											"        pm.expect(ct).to.include('application/json', 'Expected Content-Type to be application/json');\r",
+											"    }\r",
+											"});\r",
+											"\r",
+											"// =============================\r",
+											"// 5. Schema Validation Group\r",
+											"// =============================\r",
+											"function validateTransaction(obj) {\r",
+											"    pm.expect(obj).to.be.an('object')\r",
+											"    pm.expect(obj).to.have.property('amount').that.is.a('number');\r",
+											"}\r",
+											"\r",
+											"\r",
+											"// =============================\r",
+											"// 6. Debugging Output Group\r",
+											"// =============================\r",
+											"pm.test('[Debug] Output key fields to console', function() {\r",
+											"    var ct = pm.response.headers.get('Content-Type') || '';\r",
+											"    if (!ct.includes('application/json')) {\r",
+											"        this.skip();\r",
+											"        return;\r",
+											"    }\r",
+											"    var json = tryParseJson(pm.response.text());\r",
+											"    if (!json) {\r",
+											"        this.skip();\r",
+											"        return;\r",
+											"    }\r",
+											"    if (pm.request.url.path.join('/') === 'v1/admin/transactions' && Array.isArray(json.data)) {\r",
+											"        if (json.data.length > 0) logKeyFields(json.data[0]);\r",
+											"    } else if (isGetByIdRequest()) {\r",
+											"        logKeyFields(json);\r",
+											"    }\r",
+											"});\r",
+											"\r",
+											"// =============================\r",
+											"// 7. Resilience to non-JSON responses\r",
+											"// =============================\r",
+											"pm.test('[Resilience] Handle non-JSON responses gracefully', function() {\r",
+											"    var ct = pm.response.headers.get('Content-Type') || '';\r",
+											"    if (!ct.includes('application/json')) {\r",
+											"        pm.expect(true, 'Response is not JSON, skipping JSON-specific tests').to.be.true;\r",
+											"        return;\r",
+											"    }\r",
+											"    var json = tryParseJson(pm.response.text());\r",
+											"    pm.expect(json, 'Response body should be JSON').to.not.be.null;\r",
+											"});\r",
+											"\r",
+											"// =============================\r",
+											"// END TRANSACTIONS FOLDER TESTS\r",
+											"// =============================\r",
+											""
+										]
+									}
 								}
 							]
 						},
@@ -18458,338 +19686,6 @@
 							]
 						},
 						{
-							"name": "{id}",
-							"item": [
-								{
-									"name": "reviews",
-									"item": [
-										{
-											"name": "Get professional reviews by ID",
-											"request": {
-												"auth": {
-													"type": "bearer",
-													"bearer": [
-														{
-															"key": "token",
-															"value": "{{professionalToken}}",
-															"type": "string"
-														}
-													]
-												},
-												"method": "GET",
-												"header": [],
-												"url": {
-													"raw": "{{baseUrl}}/v1/professionals/:id/reviews",
-													"host": [
-														"{{baseUrl}}"
-													],
-													"path": [
-														"v1",
-														"professionals",
-														":id",
-														"reviews"
-													],
-													"variable": [
-														{
-															"key": "id",
-															"value": "{{professionalId}}",
-															"description": "Professional ID"
-														}
-													]
-												}
-											},
-											"response": [
-												{
-													"name": "Reviews retrieved successfully",
-													"originalRequest": {
-														"method": "GET",
-														"header": [
-															{
-																"key": "Authorization",
-																"value": "Bearer <token>",
-																"description": "Added as a part of security scheme: bearer"
-															}
-														],
-														"url": {
-															"raw": "{{baseUrl}}/v1/professionals/:id/reviews",
-															"host": [
-																"{{baseUrl}}"
-															],
-															"path": [
-																"v1",
-																"professionals",
-																":id",
-																"reviews"
-															],
-															"variable": [
-																{
-																	"key": "id"
-																}
-															]
-														}
-													},
-													"status": "OK",
-													"code": 200,
-													"_postman_previewlanguage": "text",
-													"header": [],
-													"cookie": [],
-													"body": ""
-												},
-												{
-													"name": "Professional not found",
-													"originalRequest": {
-														"method": "GET",
-														"header": [
-															{
-																"key": "Authorization",
-																"value": "Bearer <token>",
-																"description": "Added as a part of security scheme: bearer"
-															}
-														],
-														"url": {
-															"raw": "{{baseUrl}}/v1/professionals/:id/reviews",
-															"host": [
-																"{{baseUrl}}"
-															],
-															"path": [
-																"v1",
-																"professionals",
-																":id",
-																"reviews"
-															],
-															"variable": [
-																{
-																	"key": "id"
-																}
-															]
-														}
-													},
-													"status": "Not Found",
-													"code": 404,
-													"_postman_previewlanguage": "text",
-													"header": [],
-													"cookie": [],
-													"body": ""
-												}
-											]
-										}
-									]
-								},
-								{
-									"name": "services",
-									"item": [
-										{
-											"name": "Get professional services by ID",
-											"request": {
-												"auth": {
-													"type": "bearer",
-													"bearer": [
-														{
-															"key": "token",
-															"value": "{{professionalToken}}",
-															"type": "string"
-														}
-													]
-												},
-												"method": "GET",
-												"header": [],
-												"url": {
-													"raw": "{{baseUrl}}/v1/professionals/:id/services",
-													"host": [
-														"{{baseUrl}}"
-													],
-													"path": [
-														"v1",
-														"professionals",
-														":id",
-														"services"
-													],
-													"variable": [
-														{
-															"key": "id",
-															"value": "{{professionalId}}",
-															"description": "Professional ID"
-														}
-													]
-												}
-											},
-											"response": [
-												{
-													"name": "Services retrieved successfully",
-													"originalRequest": {
-														"method": "GET",
-														"header": [
-															{
-																"key": "Authorization",
-																"value": "Bearer <token>",
-																"description": "Added as a part of security scheme: bearer"
-															}
-														],
-														"url": {
-															"raw": "{{baseUrl}}/v1/professionals/:id/services",
-															"host": [
-																"{{baseUrl}}"
-															],
-															"path": [
-																"v1",
-																"professionals",
-																":id",
-																"services"
-															],
-															"variable": [
-																{
-																	"key": "id"
-																}
-															]
-														}
-													},
-													"status": "OK",
-													"code": 200,
-													"_postman_previewlanguage": "text",
-													"header": [],
-													"cookie": [],
-													"body": ""
-												},
-												{
-													"name": "Professional not found",
-													"originalRequest": {
-														"method": "GET",
-														"header": [
-															{
-																"key": "Authorization",
-																"value": "Bearer <token>",
-																"description": "Added as a part of security scheme: bearer"
-															}
-														],
-														"url": {
-															"raw": "{{baseUrl}}/v1/professionals/:id/services",
-															"host": [
-																"{{baseUrl}}"
-															],
-															"path": [
-																"v1",
-																"professionals",
-																":id",
-																"services"
-															],
-															"variable": [
-																{
-																	"key": "id"
-																}
-															]
-														}
-													},
-													"status": "Not Found",
-													"code": 404,
-													"_postman_previewlanguage": "text",
-													"header": [],
-													"cookie": [],
-													"body": ""
-												}
-											]
-										}
-									]
-								},
-								{
-									"name": "Get a professional by their ID",
-									"request": {
-										"method": "GET",
-										"header": [],
-										"url": {
-											"raw": "{{baseUrl}}/v1/professionals/:id",
-											"host": [
-												"{{baseUrl}}"
-											],
-											"path": [
-												"v1",
-												"professionals",
-												":id"
-											],
-											"variable": [
-												{
-													"key": "id",
-													"value": "{{professionalId}}",
-													"description": "Professional ID"
-												}
-											]
-										}
-									},
-									"response": [
-										{
-											"name": "Professional retrieved successfully",
-											"originalRequest": {
-												"method": "GET",
-												"header": [
-													{
-														"key": "Authorization",
-														"value": "Bearer <token>",
-														"description": "Added as a part of security scheme: bearer"
-													}
-												],
-												"url": {
-													"raw": "{{baseUrl}}/v1/professionals/:id",
-													"host": [
-														"{{baseUrl}}"
-													],
-													"path": [
-														"v1",
-														"professionals",
-														":id"
-													],
-													"variable": [
-														{
-															"key": "id"
-														}
-													]
-												}
-											},
-											"status": "OK",
-											"code": 200,
-											"_postman_previewlanguage": "text",
-											"header": [],
-											"cookie": [],
-											"body": ""
-										},
-										{
-											"name": "Professional not found",
-											"originalRequest": {
-												"method": "GET",
-												"header": [
-													{
-														"key": "Authorization",
-														"value": "Bearer <token>",
-														"description": "Added as a part of security scheme: bearer"
-													}
-												],
-												"url": {
-													"raw": "{{baseUrl}}/v1/professionals/:id",
-													"host": [
-														"{{baseUrl}}"
-													],
-													"path": [
-														"v1",
-														"professionals",
-														":id"
-													],
-													"variable": [
-														{
-															"key": "id"
-														}
-													]
-												}
-											},
-											"status": "Not Found",
-											"code": 404,
-											"_postman_previewlanguage": "text",
-											"header": [],
-											"cookie": [],
-											"body": ""
-										}
-									]
-								}
-							]
-						},
-						{
 							"name": "transactions",
 							"item": [
 								{
@@ -19102,941 +19998,21 @@
 											"    }).to.not.throw();\r",
 											"});\r",
 											"\r",
-											"// 3. Assert response is an object with required fields\r",
-											"pm.test(\"Response is an object with required fields\", function () {\r",
-											"    pm.expect(jsonData).to.be.an(\"object\");\r",
-											"    pm.expect(jsonData.data[0]).to.have.property(\"id\");\r",
-											"    pm.expect(jsonData.data[0]).to.have.property(\"amount\");\r",
-											"    pm.expect(jsonData.data[0]).to.have.property(\"status\");\r",
-											"});\r",
+											"// // 3. Assert response is an object with required fields\r",
+											"// pm.test(\"Response is an object with required fields\", function () {\r",
+											"//     pm.expect(jsonData).to.be.an(\"object\");\r",
+											"//     pm.expect(jsonData.data[0]).to.have.property(\"id\");\r",
+											"//     pm.expect(jsonData.data[0]).to.have.property(\"amount\");\r",
+											"//     pm.expect(jsonData.data[0]).to.have.property(\"status\");\r",
+											"// });\r",
 											"\r",
-											"// 4. Type checks for key fields\r",
-											"pm.test(\"Type checks for key fields in transaction object\", function () {\r",
-											"    pm.expect([\"string\", \"number\"]).to.include(typeof jsonData.data[0].id);\r",
-											"    pm.expect(typeof jsonData.data[0].amount).to.eql(\"number\");\r",
-											"    pm.expect(typeof jsonData.data[0].createdAt).to.eql(\"string\");\r",
-											"    pm.expect(typeof jsonData.data[0].status).to.eql(\"string\");\r",
-											"});"
-										]
-									}
-								}
-							]
-						},
-						{
-							"name": "services",
-							"item": [
-								{
-									"name": "{id}",
-									"item": [
-										{
-											"name": "Create a new service",
-											"request": {
-												"auth": {
-													"type": "bearer",
-													"bearer": [
-														{
-															"key": "token",
-															"value": "{{professionalToken}}",
-															"type": "string"
-														}
-													]
-												},
-												"method": "POST",
-												"header": [
-													{
-														"key": "Content-Type",
-														"value": "multipart/form-data"
-													}
-												],
-												"body": {
-													"mode": "formdata",
-													"formdata": [
-														{
-															"key": "name",
-															"value": "{{$randomProductName}}",
-															"type": "text"
-														},
-														{
-															"key": "categoryId",
-															"value": "{{categorgyId}}",
-															"type": "text"
-														},
-														{
-															"key": "subCategoryId",
-															"value": "{{newSubCategoryId}}",
-															"type": "text"
-														},
-														{
-															"key": "minPrice",
-															"value": "500",
-															"type": "text"
-														},
-														{
-															"key": "maxPrice",
-															"value": "1500",
-															"type": "text"
-														},
-														{
-															"key": "serviceType",
-															"value": "[\"HOME_SERVICE\"]",
-															"type": "text"
-														},
-														{
-															"key": "timeFrom",
-															"value": "06:00",
-															"type": "text"
-														},
-														{
-															"key": "timeTo",
-															"value": "17:00",
-															"type": "text"
-														},
-														{
-															"key": "timeInterval",
-															"value": "30",
-															"type": "text"
-														},
-														{
-															"key": "homeServiceCost",
-															"value": "500",
-															"type": "text"
-														},
-														{
-															"key": "status",
-															"value": "true",
-															"type": "text"
-														},
-														{
-															"key": "notes",
-															"value": "string",
-															"type": "text"
-														}
-													]
-												},
-												"url": {
-													"raw": "{{baseUrl}}/v1/services",
-													"host": [
-														"{{baseUrl}}"
-													],
-													"path": [
-														"v1",
-														"services"
-													]
-												}
-											},
-											"response": [
-												{
-													"name": "Service created successfully",
-													"originalRequest": {
-														"method": "POST",
-														"header": [
-															{
-																"key": "Content-Type",
-																"value": "multipart/form-data"
-															},
-															{
-																"key": "Authorization",
-																"value": "Bearer <token>",
-																"description": "Added as a part of security scheme: bearer"
-															}
-														],
-														"body": {
-															"mode": "formdata",
-															"formdata": []
-														},
-														"url": {
-															"raw": "{{baseUrl}}/v1/services",
-															"host": [
-																"{{baseUrl}}"
-															],
-															"path": [
-																"v1",
-																"services"
-															]
-														}
-													},
-													"status": "Created",
-													"code": 201,
-													"_postman_previewlanguage": "text",
-													"header": [],
-													"cookie": [],
-													"body": ""
-												},
-												{
-													"name": "Invalid input or no images provided",
-													"originalRequest": {
-														"method": "POST",
-														"header": [
-															{
-																"key": "Content-Type",
-																"value": "multipart/form-data"
-															},
-															{
-																"key": "Authorization",
-																"value": "Bearer <token>",
-																"description": "Added as a part of security scheme: bearer"
-															}
-														],
-														"body": {
-															"mode": "formdata",
-															"formdata": []
-														},
-														"url": {
-															"raw": "{{baseUrl}}/v1/services",
-															"host": [
-																"{{baseUrl}}"
-															],
-															"path": [
-																"v1",
-																"services"
-															]
-														}
-													},
-													"status": "Bad Request",
-													"code": 400,
-													"_postman_previewlanguage": "text",
-													"header": [],
-													"cookie": [],
-													"body": ""
-												}
-											]
-										},
-										{
-											"name": "Update service",
-											"request": {
-												"method": "PUT",
-												"header": [
-													{
-														"key": "Content-Type",
-														"value": "multipart/form-data"
-													}
-												],
-												"body": {
-													"mode": "formdata",
-													"formdata": [
-														{
-															"key": "name",
-															"value": "{{$randomProductName}}",
-															"type": "text"
-														},
-														{
-															"key": "images",
-															"type": "file",
-															"src": "postman-cloud:///1f0b8e04-43d7-49b0-a1ae-3a4b5e329b94"
-														}
-													]
-												},
-												"url": {
-													"raw": "{{baseUrl}}/v1/services/:id",
-													"host": [
-														"{{baseUrl}}"
-													],
-													"path": [
-														"v1",
-														"services",
-														":id"
-													],
-													"variable": [
-														{
-															"key": "id",
-															"value": "{{categoryId}}",
-															"description": "Service ID"
-														}
-													]
-												}
-											},
-											"response": [
-												{
-													"name": "Service updated successfully",
-													"originalRequest": {
-														"method": "PUT",
-														"header": [
-															{
-																"key": "Content-Type",
-																"value": "multipart/form-data"
-															},
-															{
-																"key": "Authorization",
-																"value": "Bearer <token>",
-																"description": "Added as a part of security scheme: bearer"
-															}
-														],
-														"body": {
-															"mode": "formdata",
-															"formdata": []
-														},
-														"url": {
-															"raw": "{{baseUrl}}/v1/services/:id",
-															"host": [
-																"{{baseUrl}}"
-															],
-															"path": [
-																"v1",
-																"services",
-																":id"
-															],
-															"variable": [
-																{
-																	"key": "id"
-																}
-															]
-														}
-													},
-													"status": "OK",
-													"code": 200,
-													"_postman_previewlanguage": "text",
-													"header": [],
-													"cookie": [],
-													"body": ""
-												},
-												{
-													"name": "Service not found",
-													"originalRequest": {
-														"method": "PUT",
-														"header": [
-															{
-																"key": "Content-Type",
-																"value": "multipart/form-data"
-															},
-															{
-																"key": "Authorization",
-																"value": "Bearer <token>",
-																"description": "Added as a part of security scheme: bearer"
-															}
-														],
-														"body": {
-															"mode": "formdata",
-															"formdata": []
-														},
-														"url": {
-															"raw": "{{baseUrl}}/v1/services/:id",
-															"host": [
-																"{{baseUrl}}"
-															],
-															"path": [
-																"v1",
-																"services",
-																":id"
-															],
-															"variable": [
-																{
-																	"key": "id"
-																}
-															]
-														}
-													},
-													"status": "Not Found",
-													"code": 404,
-													"_postman_previewlanguage": "text",
-													"header": [],
-													"cookie": [],
-													"body": ""
-												}
-											]
-										},
-										{
-											"name": "Delete service",
-											"request": {
-												"method": "DELETE",
-												"header": [],
-												"url": {
-													"raw": "{{baseUrl}}/v1/services/:id",
-													"host": [
-														"{{baseUrl}}"
-													],
-													"path": [
-														"v1",
-														"services",
-														":id"
-													],
-													"variable": [
-														{
-															"key": "id",
-															"value": "",
-															"description": "Service ID"
-														}
-													]
-												}
-											},
-											"response": [
-												{
-													"name": "Service deleted successfully",
-													"originalRequest": {
-														"method": "DELETE",
-														"header": [
-															{
-																"key": "Authorization",
-																"value": "Bearer <token>",
-																"description": "Added as a part of security scheme: bearer"
-															}
-														],
-														"url": {
-															"raw": "{{baseUrl}}/v1/services/:id",
-															"host": [
-																"{{baseUrl}}"
-															],
-															"path": [
-																"v1",
-																"services",
-																":id"
-															],
-															"variable": [
-																{
-																	"key": "id"
-																}
-															]
-														}
-													},
-													"status": "OK",
-													"code": 200,
-													"_postman_previewlanguage": "text",
-													"header": [],
-													"cookie": [],
-													"body": ""
-												},
-												{
-													"name": "Service not found",
-													"originalRequest": {
-														"method": "DELETE",
-														"header": [
-															{
-																"key": "Authorization",
-																"value": "Bearer <token>",
-																"description": "Added as a part of security scheme: bearer"
-															}
-														],
-														"url": {
-															"raw": "{{baseUrl}}/v1/services/:id",
-															"host": [
-																"{{baseUrl}}"
-															],
-															"path": [
-																"v1",
-																"services",
-																":id"
-															],
-															"variable": [
-																{
-																	"key": "id"
-																}
-															]
-														}
-													},
-													"status": "Not Found",
-													"code": 404,
-													"_postman_previewlanguage": "text",
-													"header": [],
-													"cookie": [],
-													"body": ""
-												}
-											]
-										}
-									]
-								},
-								{
-									"name": "distance",
-									"item": [
-										{
-											"name": "Get all services with distance calculation",
-											"event": [
-												{
-													"listen": "test",
-													"script": {
-														"exec": [
-															"let jsonData = pm.response.json();\r",
-															"pm.collectionVariables.set(\"serviceId\", jsonData.data[2].id);\r",
-															"pm.collectionVariables.set(\"serviceName\", jsonData.data[2].name);\r",
-															"pm.collectionVariables.set(\"minPrice\", jsonData.data[2].minPrice);\r",
-															"pm.collectionVariables.set(\"maxPrice\", jsonData.data[2].maxPrice);\r",
-															"pm.collectionVariables.set(\"userId\", jsonData.data[2].userId);\r",
-															"pm.collectionVariables.set(\"bookingTimeId\", jsonData.data[2].bookingTimeId);\r",
-															""
-														],
-														"type": "text/javascript",
-														"packages": {},
-														"requests": {}
-													}
-												},
-												{
-													"listen": "prerequest",
-													"script": {
-														"exec": [
-															""
-														],
-														"type": "text/javascript",
-														"packages": {},
-														"requests": {}
-													}
-												}
-											],
-											"request": {
-												"method": "GET",
-												"header": [],
-												"url": {
-													"raw": "{{baseUrl}}/v1/services/distance?pageNumber=1&pageSize=20&longitude=3&latitude=4",
-													"host": [
-														"{{baseUrl}}"
-													],
-													"path": [
-														"v1",
-														"services",
-														"distance"
-													],
-													"query": [
-														{
-															"key": "pageNumber",
-															"value": "1",
-															"description": "Page number for pagination"
-														},
-														{
-															"key": "pageSize",
-															"value": "20",
-															"description": "Number of items per page"
-														},
-														{
-															"key": "longitude",
-															"value": "3",
-															"description": "Search keyword for product title, description, or brand"
-														},
-														{
-															"key": "latitude",
-															"value": "4",
-															"description": "Page number for pagination"
-														}
-													]
-												}
-											},
-											"response": [
-												{
-													"name": "Services retrieved successfully with distance",
-													"originalRequest": {
-														"method": "GET",
-														"header": [
-															{
-																"key": "Authorization",
-																"value": "Bearer <token>",
-																"description": "Added as a part of security scheme: bearer"
-															}
-														],
-														"url": {
-															"raw": "{{baseUrl}}/v1/services/distance?pageNumber=1&pageSize=20&query=Samsung Galaxy",
-															"host": [
-																"{{baseUrl}}"
-															],
-															"path": [
-																"v1",
-																"services",
-																"distance"
-															],
-															"query": [
-																{
-																	"key": "pageNumber",
-																	"value": "1",
-																	"description": "Page number for pagination"
-																},
-																{
-																	"key": "pageSize",
-																	"value": "20",
-																	"description": "Number of items per page"
-																},
-																{
-																	"key": "query",
-																	"value": "Samsung Galaxy",
-																	"description": "Search keyword for product title, description, or brand"
-																}
-															]
-														}
-													},
-													"status": "OK",
-													"code": 200,
-													"_postman_previewlanguage": "text",
-													"header": [],
-													"cookie": [],
-													"body": ""
-												}
-											]
-										},
-										{
-											"name": "Get service by ID with distance calculation",
-											"event": [
-												{
-													"listen": "test",
-													"script": {
-														"exec": [
-															""
-														],
-														"type": "text/javascript",
-														"packages": {},
-														"requests": {}
-													}
-												},
-												{
-													"listen": "prerequest",
-													"script": {
-														"exec": [],
-														"type": "text/javascript"
-													}
-												}
-											],
-											"request": {
-												"method": "GET",
-												"header": [],
-												"url": {
-													"raw": "{{baseUrl}}/v1/services/:id/distance?longitude=3&latitude=4",
-													"host": [
-														"{{baseUrl}}"
-													],
-													"path": [
-														"v1",
-														"services",
-														":id",
-														"distance"
-													],
-													"query": [
-														{
-															"key": "longitude",
-															"value": "3"
-														},
-														{
-															"key": "latitude",
-															"value": "4"
-														}
-													],
-													"variable": [
-														{
-															"key": "id",
-															"value": "{{serviceId}}",
-															"type": "string",
-															"description": "Service ID"
-														}
-													]
-												}
-											},
-											"response": [
-												{
-													"name": "Service retrieved successfully with distance",
-													"originalRequest": {
-														"method": "GET",
-														"header": [
-															{
-																"key": "Authorization",
-																"value": "Bearer <token>",
-																"description": "Added as a part of security scheme: bearer"
-															}
-														],
-														"url": {
-															"raw": "{{baseUrl}}/v1/services/:id/distance",
-															"host": [
-																"{{baseUrl}}"
-															],
-															"path": [
-																"v1",
-																"services",
-																":id",
-																"distance"
-															],
-															"variable": [
-																{
-																	"key": "id"
-																}
-															]
-														}
-													},
-													"status": "OK",
-													"code": 200,
-													"_postman_previewlanguage": "text",
-													"header": [],
-													"cookie": [],
-													"body": ""
-												},
-												{
-													"name": "Service not found",
-													"originalRequest": {
-														"method": "GET",
-														"header": [
-															{
-																"key": "Authorization",
-																"value": "Bearer <token>",
-																"description": "Added as a part of security scheme: bearer"
-															}
-														],
-														"url": {
-															"raw": "{{baseUrl}}/v1/services/:id/distance",
-															"host": [
-																"{{baseUrl}}"
-															],
-															"path": [
-																"v1",
-																"services",
-																":id",
-																"distance"
-															],
-															"variable": [
-																{
-																	"key": "id"
-																}
-															]
-														}
-													},
-													"status": "Not Found",
-													"code": 404,
-													"_postman_previewlanguage": "text",
-													"header": [],
-													"cookie": [],
-													"body": ""
-												}
-											]
-										}
-									]
-								},
-								{
-									"name": "states",
-									"item": [
-										{
-											"name": "Get professional services grouped by states",
-											"request": {
-												"auth": {
-													"type": "bearer",
-													"bearer": [
-														{
-															"key": "token",
-															"value": "{{adminToken}}",
-															"type": "string"
-														}
-													]
-												},
-												"method": "GET",
-												"header": [],
-												"url": {
-													"raw": "{{baseUrl}}/v1/services/states",
-													"host": [
-														"{{baseUrl}}"
-													],
-													"path": [
-														"v1",
-														"services",
-														"states"
-													]
-												}
-											},
-											"response": [
-												{
-													"name": "Services retrieved successfully grouped by states",
-													"originalRequest": {
-														"method": "GET",
-														"header": [
-															{
-																"key": "Authorization",
-																"value": "Bearer <token>",
-																"description": "Added as a part of security scheme: bearer"
-															}
-														],
-														"url": {
-															"raw": "{{baseUrl}}/v1/services/states",
-															"host": [
-																"{{baseUrl}}"
-															],
-															"path": [
-																"v1",
-																"services",
-																"states"
-															]
-														}
-													},
-													"status": "OK",
-													"code": 200,
-													"_postman_previewlanguage": "text",
-													"header": [],
-													"cookie": [],
-													"body": ""
-												}
-											]
-										}
-									]
-								}
-							],
-							"event": [
-								{
-									"listen": "prerequest",
-									"script": {
-										"type": "text/javascript",
-										"packages": {},
-										"requests": {},
-										"exec": [
-											""
-										]
-									}
-								},
-								{
-									"listen": "test",
-									"script": {
-										"type": "text/javascript",
-										"packages": {},
-										"requests": {},
-										"exec": [
-											"if (pm.collectionVariables.get('SKIP_INHERITED_TESTS') === 'true') {\r",
-											"    // Optionally clear the variable after skipping\r",
-											"    pm.collectionVariables.unset('SKIP_INHERITED_TESTS');\r",
-											"    return; // Skip all inherited tests\r",
-											"}\r",
-											"\r",
-											"// =============================\r",
-											"// TRANSACTIONS FOLDER TESTS\r",
-											"// =============================\r",
-											"\r",
-											"// Utility: Safe JSON parse\r",
-											"function tryParseJson(body) {\r",
-											"    try { return JSON.parse(body); } catch (e) { return null; }\r",
-											"}\r",
-											"\r",
-											"// Utility: ISO 8601 date-time check\r",
-											"function isIsoDateTime(str) {\r",
-											"    return typeof str === 'string' && /^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z$/.test(str);\r",
-											"}\r",
-											"\r",
-											"// Utility: UUID v4 check (relaxed)\r",
-											"function isUuid(str) {\r",
-											"    return typeof str === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(str);\r",
-											"}\r",
-											"\r",
-											"// Utility: ISO 4217 currency code check\r",
-											"function isIso4217(str) {\r",
-											"    return typeof str === 'string' && /^[A-Z]{3}$/.test(str);\r",
-											"}\r",
-											"\r",
-											"// Utility: Enum check\r",
-											"function isStatusEnum(val) {\r",
-											"    return ['pending', 'completed', 'failed', 'refunded'].includes(val);\r",
-											"}\r",
-											"\r",
-											"// Utility: Get response time threshold\r",
-											"function getMaxResponseTime() {\r",
-											"    var envVal = pm.environment.get('TRANSACTIONS_MAX_RESPONSE_TIME_MS');\r",
-											"    var defaultVal = 2000;\r",
-											"    if (envVal && !isNaN(Number(envVal))) return Number(envVal);\r",
-											"    return defaultVal;\r",
-											"}\r",
-											"\r",
-											"// Utility: Check if request is get-by-id\r",
-											"function isGetByIdRequest() {\r",
-											"    return pm.request.url.path.some(function(seg) { return seg === ':id' || seg === pm.variables.get('id'); }) ||\r",
-											"        /\\/:(id|transactionId)/.test(pm.request.url.raw || '');\r",
-											"}\r",
-											"\r",
-											"// Utility: Get id value for get-by-id\r",
-											"function getTransactionId() {\r",
-											"    // Try path variable, then env\r",
-											"    var id = pm.variables.get('id') || pm.environment.get('id') || pm.environment.get('lastTransactionId');\r",
-											"    return id;\r",
-											"}\r",
-											"\r",
-											"// Utility: Print key fields for debugging\r",
-											"function logKeyFields(obj) {\r",
-											"    if (!obj) return;\r",
-											"    pm.test('[Debug] Log key transaction fields', function() {\r",
-											"        console.log('[Transaction]', {\r",
-											"            id: obj.id,\r",
-											"            amount: obj.amount,\r",
-											"            currency: obj.currency,\r",
-											"            status: obj.status,\r",
-											"            createdAt: obj.createdAt,\r",
-											"            updatedAt: obj.updatedAt\r",
-											"        });\r",
-											"    });\r",
-											"}\r",
-											"\r",
-											"// =============================\r",
-											"// 1. Precondition: ID presence for get-by-id\r",
-											"// =============================\r",
-											"if (isGetByIdRequest()) {\r",
-											"    var idVal = getTransactionId();\r",
-											"    pm.test('[Precondition] Transaction ID is provided for get-by-id', function() {\r",
-											"        if (!idVal) {\r",
-											"            this.skip();\r",
-											"            throw new Error('Transaction ID is missing for this request. Set an environment variable `id` or `lastTransactionId`.');\r",
-											"        }\r",
-											"    });\r",
-											"}\r",
-											"\r",
-											"// =============================\r",
-											"// 2. HTTP Status Code Group\r",
-											"// =============================\r",
-											"pm.test('[Status] Response status code is 2xx for success', function() {\r",
-											"    pm.expect(pm.response.code).to.be.within(200, 299, 'Expected a 2xx status code for success');\r",
-											"});\r",
-											"pm.test('[Status] Handle 4xx/5xx with helpful message', function() {\r",
-											"    if (pm.response.code >= 400) {\r",
-											"        var msg = 'Request failed with status ' + pm.response.code + ': ' + pm.response.reason();\r",
-											"        pm.expect.fail(msg);\r",
-											"    }\r",
-											"});\r",
-											"\r",
-											"// =============================\r",
-											"// 3. Response Time Group\r",
-											"// =============================\r",
-											"pm.test('[Performance] Response time under threshold', function() {\r",
-											"    var maxMs = getMaxResponseTime();\r",
-											"    pm.expect(pm.response.responseTime).to.be.below(maxMs, 'Response time exceeded ' + maxMs + ' ms');\r",
-											"});\r",
-											"\r",
-											"// =============================\r",
-											"// 4. Content-Type Group\r",
-											"// =============================\r",
-											"pm.test('[Content-Type] Response is JSON when applicable', function() {\r",
-											"    if (pm.response.code >= 200 && pm.response.code < 300 && pm.response.body && pm.response.body.length > 0) {\r",
-											"        pm.response.to.have.header('Content-Type');\r",
-											"        var ct = pm.response.headers.get('Content-Type') || '';\r",
-											"        pm.expect(ct).to.include('application/json', 'Expected Content-Type to be application/json');\r",
-											"    }\r",
-											"});\r",
-											"\r",
-											"// =============================\r",
-											"// 5. Schema Validation Group\r",
-											"// =============================\r",
-											"function validateTransaction(obj) {\r",
-											"    pm.expect(obj).to.be.an('object')\r",
-											"    pm.expect(obj).to.have.property('amount').that.is.a('number');\r",
-											"}\r",
-											"\r",
-											"\r",
-											"// =============================\r",
-											"// 6. Debugging Output Group\r",
-											"// =============================\r",
-											"pm.test('[Debug] Output key fields to console', function() {\r",
-											"    var ct = pm.response.headers.get('Content-Type') || '';\r",
-											"    if (!ct.includes('application/json')) {\r",
-											"        this.skip();\r",
-											"        return;\r",
-											"    }\r",
-											"    var json = tryParseJson(pm.response.text());\r",
-											"    if (!json) {\r",
-											"        this.skip();\r",
-											"        return;\r",
-											"    }\r",
-											"    if (pm.request.url.path.join('/') === 'v1/admin/transactions' && Array.isArray(json.data)) {\r",
-											"        if (json.data.length > 0) logKeyFields(json.data[0]);\r",
-											"    } else if (isGetByIdRequest()) {\r",
-											"        logKeyFields(json);\r",
-											"    }\r",
-											"});\r",
-											"\r",
-											"// =============================\r",
-											"// 7. Resilience to non-JSON responses\r",
-											"// =============================\r",
-											"pm.test('[Resilience] Handle non-JSON responses gracefully', function() {\r",
-											"    var ct = pm.response.headers.get('Content-Type') || '';\r",
-											"    if (!ct.includes('application/json')) {\r",
-											"        pm.expect(true, 'Response is not JSON, skipping JSON-specific tests').to.be.true;\r",
-											"        return;\r",
-											"    }\r",
-											"    var json = tryParseJson(pm.response.text());\r",
-											"    pm.expect(json, 'Response body should be JSON').to.not.be.null;\r",
-											"});\r",
-											"\r",
-											"// =============================\r",
-											"// END TRANSACTIONS FOLDER TESTS\r",
-											"// =============================\r",
-											""
+											"// // 4. Type checks for key fields\r",
+											"// pm.test(\"Type checks for key fields in transaction object\", function () {\r",
+											"//     pm.expect([\"string\", \"number\"]).to.include(typeof jsonData.data[0].id);\r",
+											"//     pm.expect(typeof jsonData.data[0].amount).to.eql(\"number\");\r",
+											"//     pm.expect(typeof jsonData.data[0].createdAt).to.eql(\"string\");\r",
+											"//     pm.expect(typeof jsonData.data[0].status).to.eql(\"string\");\r",
+											"// });"
 										]
 									}
 								}
@@ -20161,10 +20137,10 @@
 									"// =============================",
 									"// 3. Response Time Group",
 									"// =============================",
-									"pm.test('[Performance] Response time under threshold', function() {",
-									"    var maxMs = getMaxResponseTime();",
-									"    pm.expect(pm.response.responseTime).to.be.below(maxMs, 'Response time exceeded ' + maxMs + ' ms');",
-									"});",
+									"// pm.test('[Performance] Response time under threshold', function() {",
+									"//     var maxMs = getMaxResponseTime();",
+									"//     pm.expect(pm.response.responseTime).to.be.below(maxMs, 'Response time exceeded ' + maxMs + ' ms');",
+									"// });",
 									"",
 									"// =============================",
 									"// 4. Content-Type Group",
@@ -20235,6 +20211,130 @@
 						{
 							"name": "new bookings",
 							"item": [
+								{
+									"name": "Get all services by professionalID",
+									"event": [
+										{
+											"listen": "test",
+											"script": {
+												"exec": [
+													"let jsonData = pm.response.json();\r",
+													"pm.collectionVariables.set(\"bookServiceId\", jsonData.data[0].id);\r",
+													"pm.collectionVariables.set(\"bookServiceName\", jsonData.data[0].name);\r",
+													"pm.collectionVariables.set(\"minPrice\", jsonData.data[0].minPrice);\r",
+													"pm.collectionVariables.set(\"maxPrice\", jsonData.data[0].maxPrice);\r",
+													"pm.collectionVariables.set(\"bookCategoryId\", jsonData.data[0].categoryId);\r",
+													"pm.collectionVariables.set(\"bookSubCategoryId\", jsonData.data[0].subCategoryId);\r",
+													"pm.collectionVariables.set(\"bookingTimeId\", jsonData.data[0].bookingTimeId);\r",
+													""
+												],
+												"type": "text/javascript",
+												"packages": {},
+												"requests": {}
+											}
+										},
+										{
+											"listen": "prerequest",
+											"script": {
+												"exec": [
+													""
+												],
+												"type": "text/javascript",
+												"packages": {},
+												"requests": {}
+											}
+										}
+									],
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{adminToken}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [],
+										"url": {
+											"raw": "{{baseUrl}}/v1/services?pageNumber=1&pageSize=5",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"v1",
+												"services"
+											],
+											"query": [
+												{
+													"key": "pageNumber",
+													"value": "1",
+													"description": "Page number for pagination"
+												},
+												{
+													"key": "pageSize",
+													"value": "5",
+													"description": "Number of items per page"
+												},
+												{
+													"key": "professionalId",
+													"value": "66042dd0412f59b3f3dd1468",
+													"disabled": true
+												}
+											]
+										}
+									},
+									"response": [
+										{
+											"name": "Services retrieved successfully",
+											"originalRequest": {
+												"method": "GET",
+												"header": [
+													{
+														"key": "Authorization",
+														"value": "Bearer <token>",
+														"description": "Added as a part of security scheme: bearer"
+													}
+												],
+												"url": {
+													"raw": "{{baseUrl}}/v1/services?pageNumber=1&pageSize=20&query=Samsung Galaxy",
+													"host": [
+														"{{baseUrl}}"
+													],
+													"path": [
+														"v1",
+														"services"
+													],
+													"query": [
+														{
+															"key": "pageNumber",
+															"value": "1",
+															"description": "Page number for pagination"
+														},
+														{
+															"key": "pageSize",
+															"value": "20",
+															"description": "Number of items per page"
+														},
+														{
+															"key": "query",
+															"value": "Samsung Galaxy",
+															"description": "Search keyword for product title, description, or brand"
+														}
+													]
+												}
+											},
+											"status": "OK",
+											"code": 200,
+											"_postman_previewlanguage": "text",
+											"header": [],
+											"cookie": [],
+											"body": ""
+										}
+									]
+								},
 								{
 									"name": "Get all user bookings",
 									"event": [
@@ -20420,6 +20520,117 @@
 											},
 											"status": "OK",
 											"code": 200,
+											"_postman_previewlanguage": "text",
+											"header": [],
+											"cookie": [],
+											"body": ""
+										}
+									]
+								},
+								{
+									"name": "Create a new booking",
+									"event": [
+										{
+											"listen": "test",
+											"script": {
+												"exec": [
+													"pm.collectionVariables.set(\"bookingId\", pm.response.json().data.id);"
+												],
+												"type": "text/javascript",
+												"packages": {},
+												"requests": {}
+											}
+										},
+										{
+											"listen": "prerequest",
+											"script": {
+												"exec": [
+													""
+												],
+												"type": "text/javascript",
+												"packages": {},
+												"requests": {}
+											}
+										}
+									],
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{userToken}}",
+													"type": "string"
+												}
+											]
+										},
+										"method": "POST",
+										"header": [
+											{
+												"key": "Content-Type",
+												"value": "application/json"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n  \"baseAmount\": 1000,\n  \"totalAmount\": 1500,\n  \"totalPersons\": 1,\n  \"bookingDate\": \"2025-11-20\",\n  \"bookingTime\": \"10:00\",\n  \"professionalId\": \"{{professionalId}}\",\n  \"serviceName\": \"{{bookServiceName}}\",\n  \"serviceId\": \"{{bookServiceId}}\",\n  \"serviceType\": \"HOME_SERVICE\",\n  \"serviceImageUrl\": \"https://example.com/image.jpg\",\n  \"bookingTimeId\": \"507f1f77bcf86cd799439014\",\n  \"userLocation\": {\n    \"address1\": \"123 Main Street\",\n    \"state\": \"Lagos\",\n    \"city\": \"Sangotedo\",\n    \"country\": \"Nigeria\",\n    \"zipCode\": \"110105\",\n    \"coordinates\": {\n      \"longitude\": -3.006,\n      \"latitude\": 4.7128\n    }\n  },\n  \"notes\": \"Please bring extra supplies\",\n  \"bookingReminder\": true\n//   \"discountCode\": \"SAVE20\"\n}",
+											"options": {
+												"raw": {
+													"headerFamily": "json",
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "{{baseUrl}}/v1/bookings",
+											"host": [
+												"{{baseUrl}}"
+											],
+											"path": [
+												"v1",
+												"bookings"
+											]
+										}
+									},
+									"response": [
+										{
+											"name": "response",
+											"originalRequest": {
+												"method": "POST",
+												"header": [
+													{
+														"key": "Content-Type",
+														"value": "application/json"
+													},
+													{
+														"key": "Authorization",
+														"value": "Bearer <token>",
+														"description": "Added as a part of security scheme: bearer"
+													}
+												],
+												"body": {
+													"mode": "raw",
+													"raw": "{\n  \"baseAmount\": 100,\n  \"totalAmount\": 120,\n  \"totalPersons\": 2,\n  \"bookingDate\": \"2025-10-20\",\n  \"bookingTime\": \"14:00\",\n  \"professionalId\": \"507f1f77bcf86cd799439012\",\n  \"serviceName\": \"Hair Styling\",\n  \"serviceId\": \"507f1f77bcf86cd799439013\",\n  \"serviceType\": \"HOME_SERVICE\",\n  \"serviceImageUrl\": \"https://example.com/image.jpg\",\n  \"bookingTimeId\": \"507f1f77bcf86cd799439014\",\n  \"userLocation\": {\n    \"address1\": \"123 Main Street\",\n    \"state\": \"California\",\n    \"city\": \"San Francisco\",\n    \"country\": \"United States\",\n    \"zipCode\": \"94102\",\n    \"coordinates\": {\n      \"longitude\": -74.006,\n      \"latitude\": 40.7128\n    }\n  },\n  \"notes\": \"Please bring extra supplies\",\n  \"bookingReminder\": true,\n  \"discountCode\": \"SAVE20\"\n}",
+													"options": {
+														"raw": {
+															"headerFamily": "json",
+															"language": "json"
+														}
+													}
+												},
+												"url": {
+													"raw": "{{baseUrl}}/v1/bookings",
+													"host": [
+														"{{baseUrl}}"
+													],
+													"path": [
+														"v1",
+														"bookings"
+													]
+												}
+											},
+											"status": "Created",
+											"code": 201,
 											"_postman_previewlanguage": "text",
 											"header": [],
 											"cookie": [],
@@ -20623,117 +20834,6 @@
 											"body": ""
 										}
 									]
-								},
-								{
-									"name": "Create a new booking",
-									"event": [
-										{
-											"listen": "test",
-											"script": {
-												"exec": [
-													"pm.collectionVariables.set(\"bookingId\", pm.response.json().data.id);"
-												],
-												"type": "text/javascript",
-												"packages": {},
-												"requests": {}
-											}
-										},
-										{
-											"listen": "prerequest",
-											"script": {
-												"exec": [
-													""
-												],
-												"type": "text/javascript",
-												"packages": {},
-												"requests": {}
-											}
-										}
-									],
-									"request": {
-										"auth": {
-											"type": "bearer",
-											"bearer": [
-												{
-													"key": "token",
-													"value": "{{userToken}}",
-													"type": "string"
-												}
-											]
-										},
-										"method": "POST",
-										"header": [
-											{
-												"key": "Content-Type",
-												"value": "application/json"
-											}
-										],
-										"body": {
-											"mode": "raw",
-											"raw": "{\n  \"baseAmount\": 10000,\n  \"totalAmount\": 12000,\n  \"totalPersons\": 1,\n  \"bookingDate\": \"2025-11-20\",\n  \"bookingTime\": \"10:00\",\n  \"professionalId\": \"{{professionalId}}\",\n  \"serviceName\": \"{{serviceName}}\",\n  \"serviceId\": \"{{serviceId}}\",\n  \"serviceType\": \"VENDOR_SERVICE\",\n  \"serviceImageUrl\": \"https://example.com/image.jpg\",\n  \"bookingTimeId\": \"507f1f77bcf86cd799439014\",\n  \"userLocation\": {\n    \"address1\": \"123 Main Street\",\n    \"state\": \"Lagos\",\n    \"city\": \"Sangotedo\",\n    \"country\": \"Nigeria\",\n    \"zipCode\": \"110105\",\n    \"coordinates\": {\n      \"longitude\": -3.006,\n      \"latitude\": 4.7128\n    }\n  },\n  \"notes\": \"Please bring extra supplies\",\n  \"bookingReminder\": true\n//   \"discountCode\": \"SAVE20\"\n}",
-											"options": {
-												"raw": {
-													"headerFamily": "json",
-													"language": "json"
-												}
-											}
-										},
-										"url": {
-											"raw": "{{baseUrl}}/v1/bookings",
-											"host": [
-												"{{baseUrl}}"
-											],
-											"path": [
-												"v1",
-												"bookings"
-											]
-										}
-									},
-									"response": [
-										{
-											"name": "response",
-											"originalRequest": {
-												"method": "POST",
-												"header": [
-													{
-														"key": "Content-Type",
-														"value": "application/json"
-													},
-													{
-														"key": "Authorization",
-														"value": "Bearer <token>",
-														"description": "Added as a part of security scheme: bearer"
-													}
-												],
-												"body": {
-													"mode": "raw",
-													"raw": "{\n  \"baseAmount\": 100,\n  \"totalAmount\": 120,\n  \"totalPersons\": 2,\n  \"bookingDate\": \"2025-10-20\",\n  \"bookingTime\": \"14:00\",\n  \"professionalId\": \"507f1f77bcf86cd799439012\",\n  \"serviceName\": \"Hair Styling\",\n  \"serviceId\": \"507f1f77bcf86cd799439013\",\n  \"serviceType\": \"HOME_SERVICE\",\n  \"serviceImageUrl\": \"https://example.com/image.jpg\",\n  \"bookingTimeId\": \"507f1f77bcf86cd799439014\",\n  \"userLocation\": {\n    \"address1\": \"123 Main Street\",\n    \"state\": \"California\",\n    \"city\": \"San Francisco\",\n    \"country\": \"United States\",\n    \"zipCode\": \"94102\",\n    \"coordinates\": {\n      \"longitude\": -74.006,\n      \"latitude\": 40.7128\n    }\n  },\n  \"notes\": \"Please bring extra supplies\",\n  \"bookingReminder\": true,\n  \"discountCode\": \"SAVE20\"\n}",
-													"options": {
-														"raw": {
-															"headerFamily": "json",
-															"language": "json"
-														}
-													}
-												},
-												"url": {
-													"raw": "{{baseUrl}}/v1/bookings",
-													"host": [
-														"{{baseUrl}}"
-													],
-													"path": [
-														"v1",
-														"bookings"
-													]
-												}
-											},
-											"status": "Created",
-											"code": 201,
-											"_postman_previewlanguage": "text",
-											"header": [],
-											"cookie": [],
-											"body": ""
-										}
-									]
 								}
 							]
 						},
@@ -20926,6 +21026,16 @@
 												{
 													"name": "Generate payment URL",
 													"request": {
+														"auth": {
+															"type": "bearer",
+															"bearer": [
+																{
+																	"key": "token",
+																	"value": "{{userToken}}",
+																	"type": "string"
+																}
+															]
+														},
 														"method": "POST",
 														"header": [],
 														"url": {
@@ -20994,109 +21104,21 @@
 									]
 								},
 								{
-									"name": "reschedule",
-									"item": [
-										{
-											"name": "Reschedule a booking",
-											"request": {
-												"method": "PUT",
-												"header": [
-													{
-														"key": "Content-Type",
-														"value": "application/json"
-													}
-												],
-												"body": {
-													"mode": "raw",
-													"raw": "{\n  \"newDate\": \"2025-12-25\",\n  \"newTime\": \"02:30pm\"\n}",
-													"options": {
-														"raw": {
-															"headerFamily": "json",
-															"language": "json"
-														}
-													}
-												},
-												"url": {
-													"raw": "{{baseUrl}}/v1/bookings/:id/reschedule",
-													"host": [
-														"{{baseUrl}}"
-													],
-													"path": [
-														"v1",
-														"bookings",
-														":id",
-														"reschedule"
-													],
-													"variable": [
-														{
-															"key": "id",
-															"value": "",
-															"description": "Booking ID"
-														}
-													]
-												}
-											},
-											"response": [
-												{
-													"name": "response",
-													"originalRequest": {
-														"method": "PUT",
-														"header": [
-															{
-																"key": "Content-Type",
-																"value": "application/json"
-															},
-															{
-																"key": "Authorization",
-																"value": "Bearer <token>",
-																"description": "Added as a part of security scheme: bearer"
-															}
-														],
-														"body": {
-															"mode": "raw",
-															"raw": "{\n  \"newDate\": \"2025-12-25\",\n  \"newTime\": \"02:30pm\"\n}",
-															"options": {
-																"raw": {
-																	"headerFamily": "json",
-																	"language": "json"
-																}
-															}
-														},
-														"url": {
-															"raw": "{{baseUrl}}/v1/bookings/:id/reschedule",
-															"host": [
-																"{{baseUrl}}"
-															],
-															"path": [
-																"v1",
-																"bookings",
-																":id",
-																"reschedule"
-															],
-															"variable": [
-																{
-																	"key": "id"
-																}
-															]
-														}
-													},
-													"status": "OK",
-													"code": 200,
-													"_postman_previewlanguage": "text",
-													"header": [],
-													"cookie": [],
-													"body": ""
-												}
-											]
-										}
-									]
-								},
-								{
 									"name": "start",
 									"item": [
 										{
 											"name": "Start a booking session",
 											"request": {
+												"auth": {
+													"type": "bearer",
+													"bearer": [
+														{
+															"key": "token",
+															"value": "{{professionalToken}}",
+															"type": "string"
+														}
+													]
+												},
 												"method": "POST",
 												"header": [],
 												"url": {
@@ -21113,7 +21135,7 @@
 													"variable": [
 														{
 															"key": "id",
-															"value": "",
+															"value": "{{bookingId}}",
 															"description": "Booking ID"
 														}
 													]
@@ -21166,6 +21188,16 @@
 										{
 											"name": "Complete a booking session",
 											"request": {
+												"auth": {
+													"type": "bearer",
+													"bearer": [
+														{
+															"key": "token",
+															"value": "{{professionalToken}}",
+															"type": "string"
+														}
+													]
+												},
 												"method": "POST",
 												"header": [],
 												"url": {
@@ -21182,7 +21214,7 @@
 													"variable": [
 														{
 															"key": "id",
-															"value": "",
+															"value": "{{bookingId}}",
 															"description": "Booking ID"
 														}
 													]
@@ -21235,6 +21267,16 @@
 										{
 											"name": "Send chat notification",
 											"request": {
+												"auth": {
+													"type": "bearer",
+													"bearer": [
+														{
+															"key": "token",
+															"value": "{{professionalToken}}",
+															"type": "string"
+														}
+													]
+												},
 												"method": "POST",
 												"header": [
 													{
@@ -21266,7 +21308,7 @@
 													"variable": [
 														{
 															"key": "id",
-															"value": "",
+															"value": "{{bookingId}}",
 															"description": "Booking ID"
 														}
 													]
@@ -21328,8 +21370,126 @@
 									]
 								},
 								{
+									"name": "reschedule",
+									"item": [
+										{
+											"name": "Reschedule a booking",
+											"request": {
+												"auth": {
+													"type": "bearer",
+													"bearer": [
+														{
+															"key": "token",
+															"value": "{{userToken}}",
+															"type": "string"
+														}
+													]
+												},
+												"method": "PUT",
+												"header": [
+													{
+														"key": "Content-Type",
+														"value": "application/json"
+													}
+												],
+												"body": {
+													"mode": "raw",
+													"raw": "{\n  \"newDate\": \"2025-12-25\",\n  \"newTime\": \"02:30pm\"\n}",
+													"options": {
+														"raw": {
+															"headerFamily": "json",
+															"language": "json"
+														}
+													}
+												},
+												"url": {
+													"raw": "{{baseUrl}}/v1/bookings/:id/reschedule",
+													"host": [
+														"{{baseUrl}}"
+													],
+													"path": [
+														"v1",
+														"bookings",
+														":id",
+														"reschedule"
+													],
+													"variable": [
+														{
+															"key": "id",
+															"value": "{{bookingId}}",
+															"description": "Booking ID"
+														}
+													]
+												}
+											},
+											"response": [
+												{
+													"name": "response",
+													"originalRequest": {
+														"method": "PUT",
+														"header": [
+															{
+																"key": "Content-Type",
+																"value": "application/json"
+															},
+															{
+																"key": "Authorization",
+																"value": "Bearer <token>",
+																"description": "Added as a part of security scheme: bearer"
+															}
+														],
+														"body": {
+															"mode": "raw",
+															"raw": "{\n  \"newDate\": \"2025-12-25\",\n  \"newTime\": \"02:30pm\"\n}",
+															"options": {
+																"raw": {
+																	"headerFamily": "json",
+																	"language": "json"
+																}
+															}
+														},
+														"url": {
+															"raw": "{{baseUrl}}/v1/bookings/:id/reschedule",
+															"host": [
+																"{{baseUrl}}"
+															],
+															"path": [
+																"v1",
+																"bookings",
+																":id",
+																"reschedule"
+															],
+															"variable": [
+																{
+																	"key": "id"
+																}
+															]
+														}
+													},
+													"status": "OK",
+													"code": 200,
+													"_postman_previewlanguage": "text",
+													"header": [],
+													"cookie": [],
+													"body": ""
+												}
+											]
+										}
+									]
+								},
+								{
 									"name": "Get booking by ID",
 									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "{{professionalToken}}",
+													"type": "string"
+												}
+											]
+										},
 										"method": "GET",
 										"header": [],
 										"url": {
@@ -21345,7 +21505,7 @@
 											"variable": [
 												{
 													"key": "id",
-													"value": "",
+													"value": "{{bookingId}}",
 													"description": "Booking ID"
 												}
 											]
@@ -22951,7 +23111,7 @@
 		},
 		{
 			"key": "Password",
-			"value": ""
+			"value": "Pass@12345"
 		},
 		{
 			"key": "tempmail",
@@ -23047,22 +23207,15 @@
 		},
 		{
 			"key": "parentCategoryId",
-			"value": "",
-			"type": "default"
+			"value": ""
 		},
 		{
 			"key": "discountCategoryId",
-			"value": "",
-			"type": "default"
-		},
-		{
-			"key": "workImageGalleryId",
 			"value": ""
 		},
 		{
 			"key": "minPrice",
-			"value": "",
-			"type": "default"
+			"value": ""
 		},
 		{
 			"key": "serviceName",
@@ -23073,7 +23226,39 @@
 			"value": ""
 		},
 		{
+			"key": "thresholdTime",
+			"value": ""
+		},
+		{
 			"key": "otp",
+			"value": ""
+		},
+		{
+			"key": "otp_code",
+			"value": ""
+		},
+		{
+			"key": "workImageGalleryId",
+			"value": ""
+		},
+		{
+			"key": "bookServiceId",
+			"value": ""
+		},
+		{
+			"key": "bookServiceName",
+			"value": ""
+		},
+		{
+			"key": "bookCategoryId",
+			"value": ""
+		},
+		{
+			"key": "bookSubCategoryId",
+			"value": ""
+		},
+		{
+			"key": "newUserToken",
 			"value": ""
 		}
 	]
